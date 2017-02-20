@@ -34,6 +34,12 @@ Sequence-to-sequence auto-encoder:
 ```
 
 
+## Lint
+```
+pylint --rcfile=./yoctol-pylintrc/.pylintrc seq2vec
+```
+
+
 ## Test
 ```
 python setup.py test
