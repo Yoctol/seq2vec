@@ -1,18 +1,18 @@
 """Base Seq2Vec."""
 from abc import abstractmethod
 
+import numpy as np
+
 
 class BaseSeq2Vec(object):
     """Base sequence-to-vector class."""
 
-    @abstractmethod
     def __call__(self, seqs):
         r"""Transform multiple sequences
 
         Parameters
         ----------
         seqs: list of list of strings
-            The
 
         Returns
         -------
@@ -22,7 +22,10 @@ class BaseSeq2Vec(object):
         Raises
         ------
         """
-        pass
+        result = []
+        for seq in seqs:
+            result.append(self.transform(seq))
+        return np.array(result)
 
     @abstractmethod
     def transform(self, seq):
@@ -42,6 +45,18 @@ class BaseSeq2Vec(object):
         """
         pass
 
+
+class BaseTrainableSeq2Vec(BaseSeq2Vec):
+    """Base Trainable sequence-to-vector class."""
+
+    @abstractmethod
+    def fit(self):
+        pass
+
+    @abstractmethod
+    def fit_transform(self):
+        pass
+
     @abstractmethod
     def save(self, path):
         r"""Serialize the transformer.
@@ -58,3 +73,5 @@ class BaseSeq2Vec(object):
         ------
         """
         pass
+
+
