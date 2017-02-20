@@ -1,0 +1,20 @@
+machine:
+  timezone:
+    Asia/Taipei
+
+  environment:
+    CIRCLE_ENV: test
+
+  python:
+    version: 3.5.1
+
+dependencies:
+  pre:
+    - pip install -U pip wheel
+    - pip install -U Cython
+  override:
+    - pip install -Ur requirements.txt
+
+test:
+  override:
+    - python setup.py test
