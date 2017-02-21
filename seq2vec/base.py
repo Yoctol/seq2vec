@@ -46,7 +46,7 @@ class BaseSeq2Vec(object):
         pass
 
 
-class BaseTrainableSeq2Vec(BaseSeq2Vec):
+class TrainableInterfaceMixin(object):
     """Base Trainable sequence-to-vector class."""
 
     @abstractmethod
