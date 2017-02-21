@@ -1,4 +1,4 @@
-"""Dummy test."""
+"""Test BaseSeq2Vec."""
 from unittest import TestCase
 from unittest.mock import Mock
 
