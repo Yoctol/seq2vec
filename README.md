@@ -33,6 +33,27 @@ Sequence-to-sequence auto-encoder:
 
 ```
 
+Seq2Seq
+```python
+from seq2vec import Seq2SeqAutoEncoderUseWordHash
+
+transformer = Seq2SeqAutoEncoderUseWordHash(
+    max_index=1000,
+    max_length=10,
+    latent_size=20,
+)
+
+train_seq = [
+    ['我', '有', '一個', '蘋果'],
+    ['我', '有', '筆'],
+    ['一個', '鳳梨'],
+]
+test_seq = [
+    ['我', '愛', '吃', '鳳梨'],
+]
+transformer.fit(train_seq)
+result = transformer.transform(test_seq)
+```
 
 ## Lint
 ```
