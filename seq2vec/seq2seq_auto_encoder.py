@@ -2,6 +2,7 @@
 import numpy as np
 
 from keras.preprocessing.sequence import pad_sequences
+from keras.optimizers import RMSprop
 from keras.layers import Input, LSTM, RepeatVector
 from keras.layers import Dropout
 from keras.models import Model
@@ -21,7 +22,12 @@ def _create_single_layer_seq2seq_model(max_length, max_index, latent_size):
     model = Model(inputs, decoded)
     encoder = Model(inputs, encoded)
 
-    model.compile(loss='categorical_crossentropy', optimizer='Adam')
+    optimizer = RMSprop(
+        lr=0.0001,
+        rho=0.95,
+        decay=0.1,
+    )
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer)
     return model, encoder
 
 
