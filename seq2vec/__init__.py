@@ -1,1 +1,2 @@
 from .hash_text import HashSeq2Vec
+from .seq2seq_auto_encoder import Seq2SeqAutoEncoderUseWordHash
