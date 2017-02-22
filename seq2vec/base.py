@@ -24,11 +24,11 @@ class BaseSeq2Vec(object):
         """
         result = []
         for seq in seqs:
-            result.append(self.transform(seq))
+            result.append(self.transform_single_sequence(seq))
         return np.array(result)
 
     @abstractmethod
-    def transform(self, seq):
+    def transform_single_sequence(self, seq):
         r"""Transform one sequence
 
         Parameters
@@ -50,12 +50,12 @@ class TrainableInterfaceMixin(object):
     """Base Trainable sequence-to-vector class."""
 
     @abstractmethod
-    def fit(self):
+    def fit(self, seqs):
         pass
 
-    @abstractmethod
-    def fit_transform(self):
-        pass
+    def fit_transform(self, seqs):
+        self.fit(seqs)
+        return self.transform(seqs)
 
     @abstractmethod
     def save(self, path):

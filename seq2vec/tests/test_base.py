@@ -10,7 +10,7 @@ class MockSeq2vec(BaseSeq2Vec):
         def __init__(self, mock_transform):
             self.mock_transform = mock_transform
 
-        def transform(self, seq):
+        def transform_single_sequence(self, seq):
             self.mock_transform()
 
 
