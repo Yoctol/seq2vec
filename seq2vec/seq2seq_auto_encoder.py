@@ -5,6 +5,8 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.layers import Input, LSTM, RepeatVector
 from keras.models import Model
 
+from yoctol_utils.hash import consistent_hash
+
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
 
@@ -46,7 +48,7 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         self.encoder = encoder
 
     def _hash_seq(self, sequence):
-        return [hash(word) % self.max_index for word in sequence]
+        return [consistent_hash(word) % self.max_index for word in sequence]
 
     def _generate_padding_array(self, seqs):
         hashed_seq = []
