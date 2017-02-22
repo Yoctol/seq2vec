@@ -33,6 +33,20 @@ def _one_hot_encode_seq(seq, max_index):
 
 
 class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
+    """Hash words and feed to seq2seq auto-encoder.
+
+    Attributes
+    ----------
+    max_index: int
+        The length of input vector.
+
+    max_length: int
+        The length of longest sequence.
+
+    latent_size: int
+        The returned latent vector size after encoding.
+
+    """
 
     def __init__(self, max_index, max_length, latent_size=20):
         self.max_index = max_index
