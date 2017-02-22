@@ -52,7 +52,11 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         hashed_seq = []
         for seq in seqs:
             hashed_seq.append(self._hash_seq(seq))
-        data_pad = pad_sequences(hashed_seq, maxlen=self.max_length)
+        data_pad = pad_sequences(
+            hashed_seq,
+            maxlen=self.max_length,
+            value=0,
+        )
 
         array = []
         for seq in data_pad:
