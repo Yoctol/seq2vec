@@ -69,7 +69,7 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         return self.encoder.predict(test_x)
 
     def transform_single_sequence(self, seq):
-        pass
+        return self.transform([seq])
 
     def __call__(self, seqs):
         return self.transform(seqs)
