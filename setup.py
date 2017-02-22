@@ -16,6 +16,7 @@ setup(
     install_requires=[
         'numpy',
         'keras',
+        'yoctol_utils',
     ],
     long_description=long_description,
     classifiers=[
