@@ -15,6 +15,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
+        'keras',
     ],
     long_description=long_description,
     classifiers=[
