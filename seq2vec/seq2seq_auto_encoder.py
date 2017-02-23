@@ -103,10 +103,14 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
             array.append(np_seq)
         return np.array(array)
 
-    def fit(self, train_seqs, verbose=2, nb_epoch=10, validation_split=0.0):
+    def fit(self, train_seqs, predict_seqs=None, verbose=2, nb_epoch=10, validation_split=0.0):
         train_x = self._generate_padding_array(train_seqs)
+        if predict_seqs is None:
+            train_y = train_x
+        else:
+            train_y = self._generate_padding_array(predict_seqs)
         self.model.fit(
-            train_x, train_x,
+            train_x, train_y,
             verbose=verbose,
             nb_epoch=nb_epoch,
             validation_split=validation_split,
