@@ -13,7 +13,14 @@ from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
 
 
-def _create_single_layer_seq2seq_model(max_length, max_index, latent_size):
+def _create_single_layer_seq2seq_model(
+        max_length,
+        max_index,
+        latent_size,
+        learning_rate,
+        rho=0.9,
+        decay=0.0,
+    ):
     inputs = Input(shape=(max_length, max_index))
     encoded = LSTM(latent_size)(inputs)
     decoded = Dropout(0.3)(encoded)
@@ -23,9 +30,9 @@ def _create_single_layer_seq2seq_model(max_length, max_index, latent_size):
     encoder = Model(inputs, encoded)
 
     optimizer = RMSprop(
-        lr=0.0001,
-        rho=0.95,
-        decay=0.1,
+        lr=learning_rate,
+        rho=rho,
+        decay=decay,
     )
     model.compile(loss='categorical_crossentropy', optimizer=optimizer)
     return model, encoder
@@ -56,15 +63,23 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
 
     """
 
-    def __init__(self, max_index, max_length, latent_size=20):
+    def __init__(
+            self,
+            max_index,
+            max_length,
+            learning_rate=0.0001,
+            latent_size=20,
+        ):
         self.max_index = max_index
         self.max_length = max_length
+        self.learning_rate = learning_rate
         self.latent_size = latent_size
 
         model, encoder = _create_single_layer_seq2seq_model(
             max_length=self.max_length,
             max_index=self.max_index,
             latent_size=self.latent_size,
+            learning_rate=self.learning_rate,
         )
         self.model = model
         self.encoder = encoder
