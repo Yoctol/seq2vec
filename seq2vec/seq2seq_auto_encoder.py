@@ -2,7 +2,9 @@
 import numpy as np
 
 from keras.preprocessing.sequence import pad_sequences
+from keras.optimizers import RMSprop
 from keras.layers import Input, LSTM, RepeatVector
+from keras.layers import Dropout
 from keras.models import Model
 
 from yoctol_utils.hash import consistent_hash
@@ -14,12 +16,18 @@ from .base import TrainableInterfaceMixin
 def _create_single_layer_seq2seq_model(max_length, max_index, latent_size):
     inputs = Input(shape=(max_length, max_index))
     encoded = LSTM(latent_size)(inputs)
-    decoded = RepeatVector(max_length)(encoded)
+    decoded = Dropout(0.3)(encoded)
+    decoded = RepeatVector(max_length)(decoded)
     decoded = LSTM(max_index, return_sequences=True)(decoded)
     model = Model(inputs, decoded)
     encoder = Model(inputs, encoded)
 
-    model.compile(loss='categorical_crossentropy', optimizer='Adam')
+    optimizer = RMSprop(
+        lr=0.0001,
+        rho=0.95,
+        decay=0.1,
+    )
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer)
     return model, encoder
 
 
@@ -80,9 +88,14 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
             array.append(np_seq)
         return np.array(array)
 
-    def fit(self, train_seqs):
+    def fit(self, train_seqs, verbose=2, nb_epoch=10, validation_split=0.0):
         train_x = self._generate_padding_array(train_seqs)
-        self.model.fit(train_x, train_x, nb_epoch=10)
+        self.model.fit(
+            train_x, train_x,
+            verbose=verbose,
+            nb_epoch=nb_epoch,
+            validation_split=validation_split,
+        )
 
     def transform(self, seqs):
         test_x = self._generate_padding_array(seqs)
