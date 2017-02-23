@@ -8,7 +8,7 @@ except IOError:
 
 setup(
     name='seq2vec',
-    version='0.1.2',
+    version='0.2.0',
     description='A pip package',
     license='GNU 3.0',
     author='cph',
