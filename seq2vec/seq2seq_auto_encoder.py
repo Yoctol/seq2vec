@@ -41,7 +41,7 @@ def _create_single_layer_seq2seq_model(
 def _one_hot_encode_seq(seq, max_index):
     np_seq = []
     for idx in seq:
-        arr = np.zeros(max_index)
+        arr = np.zeros(max_index + 1)
         arr[idx] = 1
         np_seq.append(arr)
     return np_seq
@@ -77,7 +77,7 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
 
         model, encoder = _create_single_layer_seq2seq_model(
             max_length=self.max_length,
-            max_index=self.max_index,
+            max_index=self.max_index + 1,
             latent_size=self.latent_size,
             learning_rate=self.learning_rate,
         )
@@ -85,7 +85,7 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         self.encoder = encoder
 
     def _hash_seq(self, sequence):
-        return [consistent_hash(word) % self.max_index for word in sequence]
+        return [consistent_hash(word) % self.max_index + 1 for word in sequence]
 
     def _generate_padding_array(self, seqs):
         hashed_seq = []
