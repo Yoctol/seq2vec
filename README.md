@@ -6,8 +6,9 @@ Turn sequence of words into a fix-length representation vector
 ```
 pip install seq2vec
 ```
-or clone the repo, then
+or clone the repo, then install:
 ```
+git clone --recursive https://github.com/Yoctol/seq2vec.git
 python setup.py install
 ```
 
