@@ -2,9 +2,11 @@
 import numpy as np
 import pdb
 
+from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import RMSprop
 from keras.layers import Input, LSTM, RepeatVector
+from keras.layers.core import Masking
 from keras.layers import Dropout
 from keras.models import Model
 from gensim.models import Word2Vec
@@ -24,14 +26,12 @@ def _create_single_layer_seq2seq_model(
         rho=0.9,
         decay=0.01,
     ):
-    inputs = Input(shape=(max_length, max_index))
-    encoded = LSTM(128, return_sequences=True, name='en_LSTM_1')(inputs)
-    encoded = LSTM(latent_size, return_sequences=False, name='en_LSTM_2')(encoded)
-    decoded = RepeatVector(max_length)(encoded)
-    decoded = LSTM(128, return_sequences=True, name='de_LSTM_2')(decoded)
-    decoded = LSTM(max_index, return_sequences=True, name='de_LSTM_1')(decoded)
-    model = Model(inputs, decoded)
-    encoder = Model(inputs, encoded)
+    model = Sequential()
+    model.add(Masking(mask_value=0.0, input_shape=(max_length, max_index)))
+    model.add(LSTM(latent_size, return_sequences=False, name='en_LSTM_1', dropout_W=0.2, dropout_U=0.3))
+    model.add(RepeatVector(max_length))
+    model.add(LSTM(max_index, return_sequences=True, name='de_LSTM_1', dropout_W=0.2, dropout_U=0.3))
+    encoder = Model(model.input, model.get_layer('en_LSTM_1').output)
 
     optimizer = RMSprop(
         lr=learning_rate,
@@ -64,9 +64,6 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             latent_size=20,
         ):
-        #self.model_yoctol = Word2Vec.load_word2vec_format(
-        #    model_path_dict['yoctol'], binary=True
-        #)
         self.model_general = Word2Vec.load_word2vec_format(
             model_path, binary=True
         )
@@ -84,7 +81,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
-    def _generate_padding_array(self, seq):
+    def _generate_padding_array(self, seq, inverse=False):
         np_end = np.zeros(self.max_index)
 
         seq_len = len(seq)
@@ -104,12 +101,16 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         end_times = self.max_length - array_len
         for _ in range(end_times):
             np_seq.append(np_end)
-        return np.array(np_seq[::-1])
 
-    def _generate_padding_seq_array(self, seqs):
+        if inverse:
+            return np.array(np_seq[::-1])
+        else:
+            return np.array(np_seq)
+
+    def _generate_padding_seq_array(self, seqs, inverse=False):
         array = []
         for seq in seqs:
-            array.append(self._generate_padding_array(seq))
+            array.append(self._generate_padding_array(seq, inverse))
         return np.array(array)
 
     def my_generator(self, train_seqs, test_seqs):
@@ -123,8 +124,8 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
                 if end > num_seqs:
                     end = num_seqs
 
-                train_array = self._generate_padding_seq_array(train_seqs[start: end])
-                test_array = self._generate_padding_seq_array(test_seqs[start: end])
+                train_array = self._generate_padding_seq_array(train_seqs[start: end], True)
+                test_array = self._generate_padding_seq_array(test_seqs[start: end], False)
                 yield (train_array, test_array)
 
     def fit(self, train_seqs, predict_seqs=None, verbose=2, nb_epoch=10, validation_split=0.0):
@@ -154,14 +155,14 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
                                 test_seqs.append(te_line.split(' '))
                                 train_len += 1
                             else:
-                                train_array = self._generate_padding_seq_array(train_seqs)
-                                test_array = self._generate_padding_seq_array(test_seqs)
+                                train_array = self._generate_padding_seq_array(train_seqs, True)
+                                test_array = self._generate_padding_seq_array(test_seqs, False)
                                 train_seqs = [tr_line.split(' ')]
                                 test_seqs = [te_line.split(' ')]
                                 train_len = 1
                                 yield (train_array, test_array)
-                        train_array = self._generate_padding_seq_array(train_seqs)
-                        test_array = self._generate_padding_seq_array(test_seqs)
+                        train_array = self._generate_padding_seq_array(train_seqs, True)
+                        test_array = self._generate_padding_seq_array(test_seqs, False)
                         yield (train_array, test_array)
                 train_file.close()
                 test_file.close()
@@ -175,12 +176,14 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
                             train_seqs.append(line.split(' '))
                             train_len += 1
                         else:
-                            train_array = self._generate_padding_seq_array(train_seqs)
+                            train_array = self._generate_padding_seq_array(train_seqs, True)
+                            answer_array = self._generate_padding_seq_array(train_seqs, False)
                             train_seqs = [line.split(' ')]
                             train_len = 1
-                            yield (train_array, train_array)
-                    train_array = self._generate_padding_seq_array(train_seqs)
-                    yield (train_array, train_array)
+                            yield (train_array, answer_array)
+                    train_array = self._generate_padding_seq_array(train_seqs, True)
+                    answer_array = self._generate_padding_seq_array(train_seqs, False)
+                    yield (train_array, answer_array)
                 train_file.close()
 
     def fit_file(self, train_file_path, predict_file_path, verbose=1,
