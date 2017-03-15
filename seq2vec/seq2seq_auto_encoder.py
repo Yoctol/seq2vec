@@ -1,6 +1,7 @@
 """Sequence-to-Sequence Auto Encoder."""
 import numpy as np
 
+import keras.models
 from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import RMSprop
@@ -29,7 +30,7 @@ def _create_single_layer_seq2seq_model(
     model.add(
         Embedding(
             max_index, embedding_size, input_length=max_length,
-            mask_zero=True, dropout=0.2
+            name='embedding', mask_zero=True, dropout=0.2
         )
     )
     model.add(
@@ -239,3 +240,16 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
 
     def __call__(self, seqs):
         return self.transform(seqs)
+
+    def save_model(self, file_path):
+        self.model.save(file_path)
+
+    def load_model(self, file_path):
+        self.model = keras.models.load_model(file_path)
+        self.encoder = Model(
+            self.model.input, self.model.get_layer('en_LSTM_1').output
+        )
+        self.max_index = self.model.get_layer('embedding').input_dim - 1
+        self.max_length = self.model.input_shape[1]
+        self.embedding_size = self.model.get_layer('embedding').output_dim
+        self.latent_size = self.model.get_layer('en_LSTM_1').output_dim
