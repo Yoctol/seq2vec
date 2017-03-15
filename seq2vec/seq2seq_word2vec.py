@@ -1,6 +1,5 @@
 """Sequence-to-Sequence word2vec."""
 import numpy as np
-import pdb
 
 from keras.models import Sequential
 from keras.preprocessing.sequence import pad_sequences
@@ -10,6 +9,7 @@ from keras.layers.core import Masking
 from keras.layers import Dropout
 from keras.models import Model
 from gensim.models import Word2Vec
+from gensim.models.keyedvectors import KeyedVectors
 from sklearn.preprocessing import normalize
 
 from yoctol_utils.hash import consistent_hash
@@ -64,10 +64,10 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             latent_size=20,
         ):
-        self.model_general = Word2Vec.load_word2vec_format(
+        self.model_general = KeyedVectors.load_word2vec_format(
             model_path, binary=True
         )
-        self.max_index = self.model_general.vector_size
+        self.max_index = self.model_general.syn0.shape[1]
         self.max_length = max_length
         self.learning_rate = learning_rate
         self.latent_size = latent_size
