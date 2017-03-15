@@ -1,22 +1,17 @@
 """Sequence-to-Sequence word2vec."""
 import numpy as np
 
+import keras.models
 from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import RMSprop
-from keras.layers import Input, LSTM, RepeatVector
+from keras.layers import LSTM, RepeatVector
 from keras.layers.core import Masking
-from keras.layers import Dropout
 from keras.models import Model
-from gensim.models import Word2Vec
-from gensim.models.keyedvectors import KeyedVectors
 from sklearn.preprocessing import normalize
-
-from yoctol_utils.hash import consistent_hash
 
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
-
+from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
         max_length,
@@ -53,52 +48,31 @@ def _create_single_layer_seq2seq_model(
     model.compile(loss='mean_squared_error', optimizer=optimizer)
     return model, encoder
 
-def _generate_padding_array(seq, max_index, inverse=False):
-    np_end = np.zeros(max_index)
+class Seq2vecWord2vecSeqTransformer(object):
 
-    seq_len = len(seq)
-    array_len = 0
-    np_seq = []
-    for i in range(seq_len):
-        try:
-            word_arr = self.word2vec_model[seq[i]]
-            normalize(word_arr.reshape(1, -1), copy=False)
-            np_seq.append(word_arr.reshape(self.max_index))
-            array_len += 1
-        except KeyError:
-            pass
-        if array_len == self.max_length:
-            break
+    def __init__(self, word2vec_model, max_length, inverse):
+        self.max_length = max_length
+        self.max_index = word2vec_model.get_size()
+        self.word2vec = word2vec_model
+        self.inverse = inverse
 
-    end_times = self.max_length - array_len
-    for _ in range(end_times):
-        np_seq.append(np_end)
+    def seq_transform(self, seq):
+        transformed_seq = []
+        for word in seq:
+            try:
+                word_arr = self.word2vec[word]
+                normalize(word_arr.reshape(1, -1), copy=False)
+                transformed_seq.append(word_arr.reshape(self.max_index))
+            except KeyError:
+                pass
+        return transformed_seq
 
-    if inverse:
-        return np.array(np_seq[::-1])
-    else:
-        return np.array(np_seq)
-
-def _generate_padding_seq_array(self, seqs, inverse=False):
-    array = []
-    for seq in seqs:
-        array.append(self._generate_padding_array(seq, inverse))
-    return np.array(array)
-
-def my_generator(self, train_seqs, test_seqs):
-    batch_size = 32
-    num_seqs = len(train_seqs)
-    loop_times = (num_seqs + batch_size - 1) // batch_size
-    while True:
-        for i in range(loop_times):
-            start = i * batch_size
-            end = (i + 1) * batch_size
-            if end > num_seqs:
-                end = num_seqs
-
-            train_array = self._generate_padding_seq_array(train_seqs[start: end], True)
-            test_array = self._generate_padding_seq_array(test_seqs[start: end], False)
-            yield (train_array, test_array)
+    def __call__(self, seqs):
+        array = generate_padding_array(
+            seqs, self.seq_transform, np.zeros(self.max_index),
+            self.max_length, inverse=self.inverse
+        )
+        return np.array(array)
 
 class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
     """seq2seq auto-encoder using pretrained word vectors as input.
@@ -123,7 +97,12 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             latent_size=20,
         ):
-        self.word2vec_model = word2vec_model
+        self.input_transformer = Seq2vecWord2vecSeqTransformer(
+            word2vec_model, max_length, True
+        )
+        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+            word2vec_model, max_length, False
+        )
         self.max_index = word2vec_model.get_size()
         self.max_length = max_length
         self.learning_rate = learning_rate
@@ -138,79 +117,35 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
-    def fit(self, train_seqs, predict_seqs=None, verbose=2, nb_epoch=10, validation_split=0.0):
+    def fit(self, train_seqs, predict_seqs=None, verbose=2,
+            nb_epoch=10, validation_split=0.0):
+        train_x = self.input_transformer(train_seqs)
         if predict_seqs is None:
-            test_seqs = train_seqs
+            train_y = self.output_transformer(train_seqs)
         else:
-            test_seqs = predict_seqs
-        self.model.fit_generator(
-            self.my_generator(train_seqs, test_seqs),
-            samples_per_epoch=40000,
+            train_y = self.output_transformer(predict_seqs)
+
+        self.model.fit(
+            train_x, train_y,
             verbose=verbose,
             nb_epoch=nb_epoch,
+            validation_split=validation_split,
         )
 
-    def file_generator(self, train_file_path, predict_file_path=None,
-                       batch_size=128):
-        while True:
-            if predict_file_path is not None:
-                with open(train_file_path, 'r', encoding='utf-8') as train_file:
-                    with open(predict_file_path, 'r', encoding='utf-8') as test_file:
-                        train_seqs = []
-                        test_seqs = []
-                        train_len = 0
-                        for tr_line, te_line in zip(train_file, test_file):
-                            if train_len < batch_size:
-                                train_seqs.append(tr_line.split(' '))
-                                test_seqs.append(te_line.split(' '))
-                                train_len += 1
-                            else:
-                                train_array = self._generate_padding_seq_array(train_seqs, True)
-                                test_array = self._generate_padding_seq_array(test_seqs, False)
-                                train_seqs = [tr_line.split(' ')]
-                                test_seqs = [te_line.split(' ')]
-                                train_len = 1
-                                yield (train_array, test_array)
-                        train_array = self._generate_padding_seq_array(train_seqs, True)
-                        test_array = self._generate_padding_seq_array(test_seqs, False)
-                        yield (train_array, test_array)
-                train_file.close()
-                test_file.close()
-
-            else:
-                with open(train_file_path, 'r', encoding='utf-8') as train_file:
-                    train_seqs = []
-                    train_len = 0
-                    for line in train_file:
-                        if train_len < batch_size:
-                            train_seqs.append(line.split(' '))
-                            train_len += 1
-                        else:
-                            train_array = self._generate_padding_seq_array(train_seqs, True)
-                            answer_array = self._generate_padding_seq_array(train_seqs, False)
-                            train_seqs = [line.split(' ')]
-                            train_len = 1
-                            yield (train_array, answer_array)
-                    train_array = self._generate_padding_seq_array(train_seqs, True)
-                    answer_array = self._generate_padding_seq_array(train_seqs, False)
-                    yield (train_array, answer_array)
-                train_file.close()
-
-    def fit_file(self, train_file_path, predict_file_path, verbose=1,
-                 nb_epoch=10, batch_size=1024, batch_number=1024):
+    def fit_generator(self, train_file_generator, test_file_generator,
+                      verbose=1, nb_epoch=10, batch_size=1024,
+                      batch_number=1024):
         self.model.fit_generator(
-            self.file_generator(train_file_path, batch_size=batch_size),
+            train_file_generator,
             samples_per_epoch=batch_size * batch_number,
-            validation_data=self.file_generator(
-                predict_file_path, batch_size=batch_size
-            ),
+            validation_data=test_file_generator,
             nb_val_samples=batch_size * batch_number,
             verbose=verbose,
             nb_epoch=nb_epoch,
         )
 
     def transform(self, seqs):
-        test_x = self._generate_padding_seq_array(seqs)
+        test_x = self.input_transformer(seqs)
         return self.encoder.predict(test_x)
 
     def transform_single_sequence(self, seq):
@@ -218,3 +153,15 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
 
     def __call__(self, seqs):
         return self.transform(seqs)
+
+    def save_model(self, file_path):
+        self.model.save(file_path)
+
+    def load_model(self, file_path):
+        self.model = keras.models.load_model(file_path)
+        self.encoder = Model(
+            self.model.input, self.model.get_layer('en_LSTM_1').output
+        )
+        self.max_index = self.model.input_shape[2]
+        self.max_length = self.model.input_shape[1]
+        self.latent_size = self.model.get_layer('en_LSTM_1').output_dim
