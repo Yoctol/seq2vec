@@ -17,6 +17,8 @@ setup(
         'numpy',
         'keras',
         'yoctol_utils',
+        'gensim',
+        'h5py'
     ],
     long_description=long_description,
     classifiers=[
