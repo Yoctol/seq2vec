@@ -48,4 +48,4 @@ class DataGenterator(object):
             ):
                 assert (len(x_array) == len(y_array)), \
                     'training data has different length with testing data'
-                yield (x_array, y_array)
+                return (x_array, y_array)

@@ -11,6 +11,7 @@ from sklearn.preprocessing import normalize
 
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
+from .base import BaseTransformer
 from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
@@ -48,7 +49,7 @@ def _create_single_layer_seq2seq_model(
     model.compile(loss='mean_squared_error', optimizer=optimizer)
     return model, encoder
 
-class Seq2vecWord2vecSeqTransformer(object):
+class Seq2vecWord2vecSeqTransformer(BaseTransformer):
 
     def __init__(self, word2vec_model, max_length, inverse):
         self.max_length = max_length

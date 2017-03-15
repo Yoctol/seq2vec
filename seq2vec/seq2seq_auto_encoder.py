@@ -14,6 +14,7 @@ from yoctol_utils.hash import consistent_hash
 
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
+from .base import BaseTransformer
 from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
@@ -78,7 +79,7 @@ def _one_hot_encode_seq(seq, max_index):
 def _hash_seq(sequence, max_index):
     return [consistent_hash(word) % max_index + 1 for word in sequence]
 
-class Seq2vecAutoEncoderInputTransformer(object):
+class Seq2vecAutoEncoderInputTransformer(BaseTransformer):
 
     def __init__(self, max_index, max_length):
         self.max_index = max_index
@@ -93,7 +94,7 @@ class Seq2vecAutoEncoderInputTransformer(object):
         )
         return array
 
-class Seq2vecAutoEncoderOutputTransformer(object):
+class Seq2vecAutoEncoderOutputTransformer(BaseTransformer):
 
     def __init__(self, max_index, max_length):
         self.max_index = max_index
@@ -177,13 +178,14 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
 
 
     def fit_generator(self, train_file_generator, test_file_generator,
-                      verbose=1, nb_epoch=10, batch_size=1024,
-                      batch_number=1024):
+                      verbose=1, nb_epoch=10, batch_number=1024):
+        training_sample_num = train_file_generator.batch_size * batch_number
+        testing_sample_num = test_file_generator.batch_size * batch_number
         self.model.fit_generator(
             train_file_generator,
-            samples_per_epoch=batch_size * batch_number,
+            samples_per_epoch=training_sample_num,
             validation_data=test_file_generator,
-            nb_val_samples=batch_size * batch_number,
+            nb_val_samples=testing_sample_num,
             verbose=verbose,
             nb_epoch=nb_epoch,
         )

@@ -74,4 +74,15 @@ class TrainableInterfaceMixin(object):
         """
         pass
 
+class BaseTransformer(object):
+    """
+        Base transformer to transform seq to input or output of seq2vec model
+    """
 
+    @abstractmethod
+    def seq_transform(self, seq):
+        pass
+
+    @abstractmethod
+    def __call__(self, seqs):
+        pass
