@@ -3,9 +3,8 @@ import numpy as np
 
 import keras.models
 from keras.models import Sequential
-from keras.preprocessing.sequence import pad_sequences
 from keras.optimizers import RMSprop
-from keras.layers import Input, LSTM, RepeatVector
+from keras.layers import LSTM, RepeatVector
 from keras.layers.embeddings import Embedding
 from keras.layers.wrappers import TimeDistributed
 from keras.layers import Dense, Dropout, Activation
@@ -15,6 +14,7 @@ from yoctol_utils.hash import consistent_hash
 
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
+from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
         max_length,
@@ -78,84 +78,39 @@ def _one_hot_encode_seq(seq, max_index):
 def _hash_seq(sequence, max_index):
     return [consistent_hash(word) % max_index + 1 for word in sequence]
 
-def _generate_padding_array(seqs, max_index, max_length):
-    hashed_seq = []
-    for seq in seqs:
-        hashed_seq.append(_hash_seq(seq[::-1], max_index))
-    data_pad = pad_sequences(
-        hashed_seq,
-        maxlen=max_length,
-        value=0,
-    )
-    return data_pad
+class Seq2vecAutoEncoderInputTransformer(object):
 
-def _generate_padding_answer_array(seqs, max_index, max_length):
-    hashed_seq = []
-    for seq in seqs:
-        hashed_seq.append(
-            _one_hot_encode_seq(_hash_seq(seq, max_index), max_index)
-        )
-    data_pad = pad_sequences(
-        hashed_seq,
-        maxlen=max_length,
-        value=np.zeros(max_index + 1),
-        padding='post', truncating='post'
-    )
-    return np.array(data_pad)
-
-class Seq2vecAutoEncoderDataGenterator(object):
-
-    def __init__(
-            self, train_file_path, max_index, max_length,
-            predict_file_path=None, batch_size=128
-    ):
-
-        self.train_file_path = train_file_path
-        self.predict_file_path = train_file_path
-        if predict_file_path is not None:
-            self.predict_file_path = predict_file_path
-
+    def __init__(self, max_index, max_length):
         self.max_index = max_index
         self.max_length = max_length
-        self.batch_size = batch_size
 
-    def array_generator(self, file_path, generating_function, batch_size):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            seqs = []
-            seqs_len = 0
-            for line in f:
-                if seqs_len < batch_size:
-                    seqs.append(line.strip().split(' '))
-                    seqs_len += 1
-                else:
-                    array = generating_function(
-                        seqs, self.max_index, self.max_length
-                    )
-                    seqs = [line.strip().split(' ')]
-                    seqs_len = 1
-                    yield array
-            array = generating_function(
-                seqs, self.max_index, self.max_length
-            )
-            yield array
+    def seq_transform(self, seq):
+        return _hash_seq(seq, self.max_index)
 
-    def __next__(self):
-        while True:
-            for x_array, y_array in zip(
-                    self.array_generator(
-                        self.train_file_path,
-                        _generate_padding_array,
-                        self.batch_size
-                    ),
-                    self.array_generator(
-                        self.predict_file_path,
-                        _generate_padding_answer_array,
-                        self.batch_size
-                    )
-            ):
-                assert (len(x_array) == len(y_array)), \
-                    'training data has different length with testing data'
-                yield (x_array, y_array)
+    def __call__(self, seqs):
+        array = generate_padding_array(
+            seqs, self.seq_transform, 0, self.max_length, inverse=True
+        )
+        return array
+
+class Seq2vecAutoEncoderOutputTransformer(object):
+
+    def __init__(self, max_index, max_length):
+        self.max_index = max_index
+        self.max_length = max_length
+
+    def seq_transform(self, seq):
+        transformed_seq = _one_hot_encode_seq(
+            _hash_seq(seq, self.max_index), self.max_index
+        )
+        return transformed_seq
+
+    def __call__(self, seqs):
+        array = generate_padding_array(
+            seqs, self.seq_transform, np.zeros(self.max_index + 1),
+            self.max_length, inverse=False
+        )
+        return np.array(array)
 
 class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
     """Hash words and feed to seq2seq auto-encoder.
@@ -187,6 +142,13 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         self.embedding_size = embedding_size
         self.latent_size = latent_size
 
+        self.input_transformer = Seq2vecAutoEncoderInputTransformer(
+            max_index, max_length
+        )
+        self.output_transformer = Seq2vecAutoEncoderOutputTransformer(
+            max_index, max_length
+        )
+
         model, encoder = _create_single_layer_seq2seq_model(
             max_length=self.max_length,
             max_index=self.max_index + 1,
@@ -200,17 +162,12 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
 
     def fit(self, train_seqs, predict_seqs=None, verbose=2,
             nb_epoch=10, validation_split=0.2):
-        train_x = _generate_padding_array(
-            train_seqs, self.max_index, self.max_length
-        )
+        train_x = self.input_transformer(train_seqs)
         if predict_seqs is None:
-            train_y = _generate_padding_answer_array(
-                train_seqs, self.max_index, self.max_length
-            )
+            train_y = self.output_transformer(train_seqs)
         else:
-            train_y = _generate_padding_answer_array(
-                predict_seqs, self.max_index, self.max_length
-            )
+            train_y = self.output_transformer(predict_seqs)
+
         self.model.fit(
             train_x, train_y,
             verbose=verbose,
@@ -232,7 +189,7 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         )
 
     def transform(self, seqs):
-        test_x = _generate_padding_array(seqs, self.max_index, self.max_length)
+        test_x = self.input_transformer(seqs)
         return self.encoder.predict(test_x)
 
     def transform_single_sequence(self, seq):
