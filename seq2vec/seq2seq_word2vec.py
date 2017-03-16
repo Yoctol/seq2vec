@@ -118,47 +118,6 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
-    def fit(self, train_seqs, predict_seqs=None, verbose=2,
-            nb_epoch=10, validation_split=0.0):
-        train_x = self.input_transformer(train_seqs)
-        if predict_seqs is None:
-            train_y = self.output_transformer(train_seqs)
-        else:
-            train_y = self.output_transformer(predict_seqs)
-
-        self.model.fit(
-            train_x, train_y,
-            verbose=verbose,
-            nb_epoch=nb_epoch,
-            validation_split=validation_split,
-        )
-
-    def fit_generator(self, train_file_generator, test_file_generator,
-                      verbose=1, nb_epoch=10, batch_number=1024):
-        training_sample_num = train_file_generator.batch_size * batch_number
-        testing_sample_num = test_file_generator.batch_size * batch_number
-        self.model.fit_generator(
-            train_file_generator,
-            samples_per_epoch=training_sample_num,
-            validation_data=test_file_generator,
-            nb_val_samples=testing_sample_num,
-            verbose=verbose,
-            nb_epoch=nb_epoch,
-        )
-
-    def transform(self, seqs):
-        test_x = self.input_transformer(seqs)
-        return self.encoder.predict(test_x)
-
-    def transform_single_sequence(self, seq):
-        return self.transform([seq])
-
-    def __call__(self, seqs):
-        return self.transform(seqs)
-
-    def save_model(self, file_path):
-        self.model.save(file_path)
-
     def load_model(self, file_path):
         self.model = keras.models.load_model(file_path)
         self.encoder = Model(
