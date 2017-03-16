@@ -1,7 +1,7 @@
 pylint
 numpy
 tensorflow
-keras >= 1.2.2
+keras == 1.2.2
 yoctol_utils
 gensim
 h5py
