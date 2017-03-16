@@ -73,7 +73,7 @@ class Seq2vecWord2vecSeqTransformer(BaseTransformer):
             seqs, self.seq_transform, np.zeros(self.max_index),
             self.max_length, inverse=self.inverse
         )
-        return np.array(array)
+        return array
 
 class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
     """seq2seq auto-encoder using pretrained word vectors as input.
@@ -134,13 +134,14 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         )
 
     def fit_generator(self, train_file_generator, test_file_generator,
-                      verbose=1, nb_epoch=10, batch_size=1024,
-                      batch_number=1024):
+                      verbose=1, nb_epoch=10, batch_number=1024):
+        training_sample_num = train_file_generator.batch_size * batch_number
+        testing_sample_num = test_file_generator.batch_size * batch_number
         self.model.fit_generator(
             train_file_generator,
-            samples_per_epoch=batch_size * batch_number,
+            samples_per_epoch=training_sample_num,
             validation_data=test_file_generator,
-            nb_val_samples=batch_size * batch_number,
+            nb_val_samples=testing_sample_num,
             verbose=verbose,
             nb_epoch=nb_epoch,
         )

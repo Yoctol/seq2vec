@@ -111,7 +111,7 @@ class Seq2vecAutoEncoderOutputTransformer(BaseTransformer):
             seqs, self.seq_transform, np.zeros(self.max_index + 1),
             self.max_length, inverse=False
         )
-        return np.array(array)
+        return array
 
 class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
     """Hash words and feed to seq2seq auto-encoder.

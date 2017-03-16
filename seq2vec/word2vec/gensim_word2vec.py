@@ -1,6 +1,6 @@
 from gensim.models.keyedvectors import KeyedVectors
 
-from base_word2vec import BaseWord2vecClass
+from .base_word2vec import BaseWord2vecClass
 
 class GensimWord2vec(BaseWord2vecClass):
 
