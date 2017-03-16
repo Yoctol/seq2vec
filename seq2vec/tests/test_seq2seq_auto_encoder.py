@@ -5,6 +5,7 @@ from os.path import dirname
 from os.path import join
 
 import numpy as np
+from yoctol_utils.hash import consistent_hash
 
 from ..seq2seq_auto_encoder import Seq2SeqAutoEncoderUseWordHash
 from ..seq2seq_auto_encoder import Seq2vecAutoEncoderInputTransformer
@@ -76,3 +77,64 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
 
         result = self.transformer(self.train_seq)
         self.assertEqual(result.shape[1], self.latent_size)
+
+class TestSeq2SeqAutoEncoderInputTransformerClass(TestCase):
+
+    def setUp(self):
+        self.input = Seq2vecAutoEncoderInputTransformer(
+            max_index=10, max_length=5
+        )
+        self.seqs = [
+            ['我', '有', '一顆', '蘋果'],
+            ['你', '有', '兩顆', '葡萄']
+        ]
+
+    def test_seq_transform(self):
+        answer = []
+        for word in self.seqs[0]:
+            answer.append(consistent_hash(word) % 10 + 1)
+        self.assertEqual(answer, self.input.seq_transform(self.seqs[0]))
+
+    def test_call(self):
+        answer = np.zeros((2, 5))
+        for i, seq in enumerate(self.seqs):
+            for j, word in enumerate(seq[::-1]):
+                answer[i, j + 1] = consistent_hash(word) % 10 + 1
+        np.testing.assert_array_almost_equal(answer, self.input(self.seqs))
+
+class TestSeq2SeqAutoEncoderOutputTransformerClass(TestCase):
+
+    def setUp(self):
+        self.output = Seq2vecAutoEncoderOutputTransformer(
+            max_index=10, max_length=5
+        )
+        self.seqs = [
+            ['我', '有', '一顆', '蘋果'],
+            ['你', '有', '兩顆', '葡萄']
+        ]
+
+    def test_seq_transform(self):
+        answer = []
+        for word in self.seqs[0]:
+            index = consistent_hash(word) % 10 + 1
+            zero = np.zeros(11)
+            zero[index] = 1
+            answer.append(zero)
+
+        transformed_array_list = self.output.seq_transform(self.seqs[0])
+        for answer_array, transformed_array in zip(
+            answer, transformed_array_list
+        ):
+            np.testing.assert_array_almost_equal(
+                answer_array, transformed_array
+            )
+
+    def test_call(self):
+        answer = np.zeros((2, 5, 11))
+        for i, seq in enumerate(self.seqs):
+            for j, word in enumerate(seq):
+                zero = np.zeros(11)
+                index = consistent_hash(word) % 10 + 1
+                zero[index] = 1
+                answer[i, j] = zero
+        np.testing.assert_array_almost_equal(answer, self.output(self.seqs))
