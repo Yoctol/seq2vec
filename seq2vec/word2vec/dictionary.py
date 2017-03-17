@@ -13,6 +13,8 @@ class Dictionary(object):
             return self.dictionary[key] + self.offset
         else:
             return 1
+    def size(self):
+        return len(self.dictionary) + self.offset
 
     def load_dict(self, dict_path):
         with open(dict_path, 'rb') as dict_file:

@@ -14,6 +14,9 @@ class TestDictionaryClass(TestCase):
 
         self.current_dir = dirname(abspath(__file__))
 
+    def test_size(self):
+        self.assertEqual(self.dictionary.size(), 9)
+
     def test_getitem(self):
         self.assertEqual(3, self.dictionary['養'])
         self.assertEqual(6, self.dictionary['隻'])

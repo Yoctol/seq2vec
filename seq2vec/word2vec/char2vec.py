@@ -28,7 +28,7 @@ def _create_char2vec_model(
     )
     model.add(
         LSTM(
-            output_dim=word2vec_size(), return_sequences=False,
+            output_dim=word2vec_size, return_sequences=False,
             name='LSTM_1', dropout_W=0.2, dropout_U=0.3
         )
     )
@@ -44,7 +44,7 @@ def _create_char2vec_model(
         rho=rho,
         decay=decay,
     )
-    model.compile(loss='mean_square_error', optimizer=optimizer)
+    model.compile(loss='mean_squared_error', optimizer=optimizer)
     return model, encoder
 
 class Char2vecInputTransformer(BaseTransformer):
@@ -105,8 +105,8 @@ class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
             learning_rate=learning_rate
         )
 
-        self.input_transform = Char2vecInputTransformer(dictionary, max_length)
-        self.output_transform = Char2vecOutputTransformer(word2vec)
+        self.input_transformer = Char2vecInputTransformer(dictionary, max_length)
+        self.output_transformer = Char2vecOutputTransformer(word2vec)
 
     def load_model(self, file_path):
         self.model = keras.models.load_model(file_path)
@@ -115,3 +115,14 @@ class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
         )
         self.max_length = self.model.input_shape[1]
         self.embedding_size = self.model.get_layer('embedding').output_dim
+
+    def transform(self, seqs):
+        test_x = self.input_transformer(seqs)
+        prediction_seqs = self.encoder.predict(test_x)
+        prediction = []
+        for seq in prediction_seqs:
+            prediction.append(seq[-1, :])
+        return np.array(prediction)
+
+    def __call__(self, seqs):
+        return self.transform(seqs)
