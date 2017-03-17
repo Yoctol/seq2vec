@@ -1,33 +1,63 @@
 """Sequence-to-Sequence Auto Encoder."""
 import numpy as np
 
-from keras.preprocessing.sequence import pad_sequences
+import keras.models
+from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.layers import Input, LSTM, RepeatVector
-from keras.layers import Dropout
+from keras.layers import LSTM, RepeatVector
+from keras.layers.embeddings import Embedding
+from keras.layers.wrappers import TimeDistributed
+from keras.layers import Dense, Dropout, Activation
 from keras.models import Model
 
 from yoctol_utils.hash import consistent_hash
 
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
-
+from .base import BaseTransformer
+from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
         max_length,
         max_index,
+        embedding_size,
         latent_size,
         learning_rate,
         rho=0.9,
-        decay=0.0,
+        decay=0.01,
     ):
-    inputs = Input(shape=(max_length, max_index))
-    encoded = LSTM(latent_size)(inputs)
-    decoded = Dropout(0.3)(encoded)
-    decoded = RepeatVector(max_length)(decoded)
-    decoded = LSTM(max_index, return_sequences=True)(decoded)
-    model = Model(inputs, decoded)
-    encoder = Model(inputs, encoded)
+
+    model = Sequential()
+    model.add(
+        Embedding(
+            max_index, embedding_size, input_length=max_length,
+            name='embedding', mask_zero=True, dropout=0.2
+        )
+    )
+    model.add(
+        LSTM(
+            output_dim=latent_size, return_sequences=False,
+            name='en_LSTM_1', dropout_W=0.2, dropout_U=0.3
+        )
+    )
+    model.add(
+        RepeatVector(max_length)
+    )
+    model.add(
+        LSTM(
+            embedding_size, return_sequences=True,
+            name='de_LSTM_1', dropout_W=0.2, dropout_U=0.3
+        )
+    )
+    model.add(
+        TimeDistributed(Dense(max_index))
+    )
+    model.add(Dropout(0.2))
+    model.add(Activation('softmax'))
+
+    encoder = Model(
+        model.input, model.get_layer('en_LSTM_1').output
+    )
 
     optimizer = RMSprop(
         lr=learning_rate,
@@ -46,6 +76,42 @@ def _one_hot_encode_seq(seq, max_index):
         np_seq.append(arr)
     return np_seq
 
+def _hash_seq(sequence, max_index):
+    return [consistent_hash(word) % max_index + 1 for word in sequence]
+
+class Seq2vecAutoEncoderInputTransformer(BaseTransformer):
+
+    def __init__(self, max_index, max_length):
+        self.max_index = max_index
+        self.max_length = max_length
+
+    def seq_transform(self, seq):
+        return _hash_seq(seq, self.max_index)
+
+    def __call__(self, seqs):
+        array = generate_padding_array(
+            seqs, self.seq_transform, 0, self.max_length, inverse=True
+        )
+        return array
+
+class Seq2vecAutoEncoderOutputTransformer(BaseTransformer):
+
+    def __init__(self, max_index, max_length):
+        self.max_index = max_index
+        self.max_length = max_length
+
+    def seq_transform(self, seq):
+        transformed_seq = _one_hot_encode_seq(
+            _hash_seq(seq, self.max_index), self.max_index
+        )
+        return transformed_seq
+
+    def __call__(self, seqs):
+        array = generate_padding_array(
+            seqs, self.seq_transform, np.zeros(self.max_index + 1),
+            self.max_length, inverse=False
+        )
+        return array
 
 class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
     """Hash words and feed to seq2seq auto-encoder.
@@ -68,60 +134,38 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
             max_index,
             max_length,
             learning_rate=0.0001,
+            embedding_size=64,
             latent_size=20,
         ):
         self.max_index = max_index
         self.max_length = max_length
         self.learning_rate = learning_rate
+        self.embedding_size = embedding_size
         self.latent_size = latent_size
+
+        self.input_transformer = Seq2vecAutoEncoderInputTransformer(
+            max_index, max_length
+        )
+        self.output_transformer = Seq2vecAutoEncoderOutputTransformer(
+            max_index, max_length
+        )
 
         model, encoder = _create_single_layer_seq2seq_model(
             max_length=self.max_length,
             max_index=self.max_index + 1,
+            embedding_size=self.embedding_size,
             latent_size=self.latent_size,
             learning_rate=self.learning_rate,
         )
         self.model = model
         self.encoder = encoder
 
-    def _hash_seq(self, sequence):
-        return [consistent_hash(word) % self.max_index + 1 for word in sequence]
-
-    def _generate_padding_array(self, seqs):
-        hashed_seq = []
-        for seq in seqs:
-            hashed_seq.append(self._hash_seq(seq))
-        data_pad = pad_sequences(
-            hashed_seq,
-            maxlen=self.max_length,
-            value=0,
+    def load_model(self, file_path):
+        self.model = keras.models.load_model(file_path)
+        self.encoder = Model(
+            self.model.input, self.model.get_layer('en_LSTM_1').output
         )
-
-        array = []
-        for seq in data_pad:
-            np_seq = _one_hot_encode_seq(seq, self.max_index)
-            array.append(np_seq)
-        return np.array(array)
-
-    def fit(self, train_seqs, predict_seqs=None, verbose=2, nb_epoch=10, validation_split=0.0):
-        train_x = self._generate_padding_array(train_seqs)
-        if predict_seqs is None:
-            train_y = train_x
-        else:
-            train_y = self._generate_padding_array(predict_seqs)
-        self.model.fit(
-            train_x, train_y,
-            verbose=verbose,
-            nb_epoch=nb_epoch,
-            validation_split=validation_split,
-        )
-
-    def transform(self, seqs):
-        test_x = self._generate_padding_array(seqs)
-        return self.encoder.predict(test_x)
-
-    def transform_single_sequence(self, seq):
-        return self.transform([seq])
-
-    def __call__(self, seqs):
-        return self.transform(seqs)
+        self.max_index = self.model.get_layer('embedding').input_dim - 1
+        self.max_length = self.model.input_shape[1]
+        self.embedding_size = self.model.get_layer('embedding').output_dim
+        self.latent_size = self.model.get_layer('en_LSTM_1').output_dim
