@@ -136,6 +136,12 @@ class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
         self.max_length = self.model.input_shape[1]
         self.embedding_size = self.model.get_layer('embedding').output_dim
 
+    def get_size(self):
+        return self.embedding_size
+
+    def __getitem__(self, key):
+        return self.transform([[key]]).reshape(self.get_size())
+
     def transform(self, seqs):
         test_x = self.input_transformer(seqs)
         prediction_seqs = self.encoder.predict(test_x)

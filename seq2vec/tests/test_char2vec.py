@@ -45,6 +45,15 @@ class TestChar2vecClass(TestCase):
             self.model(self.test_seqs), new_model(self.test_seqs)
         )
 
+    def test_get_size(self):
+        self.assertEqual(32, self.model.get_size())
+
+    def test_get_item(self):
+        word = '我'
+        np.testing.assert_array_almost_equal(
+            self.model.transform([[word]]).reshape(32), self.model[word]
+        )
+
 class Testchar2vecTransformerClass(TestCase):
 
     def setUp(self):
