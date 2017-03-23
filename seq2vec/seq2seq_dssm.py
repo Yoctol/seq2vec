@@ -30,7 +30,7 @@ def _create_dssm_model(
     model.add(Dense(latent_size, name='encoder', activation='relu'))
     model.add(Dense(embedding_size, name='decoder', activation='relu'))
     model.add(Dropout(0.2))
-    model.add(Dense(max_index, name='output'))
+    model.add(Dense(max_index, name='output', activation='softmax'))
 
     encoder = Model(
         model.input, model.get_layer('encoder').output
@@ -41,7 +41,7 @@ def _create_dssm_model(
         rho=rho,
         decay=decay,
     )
-    model.compile(loss='kullback_leibler_divergence', optimizer=optimizer)
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer)
     return model, encoder
 
 class Seq2vecDSSMTransformer(BaseTransformer):

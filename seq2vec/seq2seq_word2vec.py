@@ -40,7 +40,7 @@ def _create_single_layer_seq2seq_model(
     model.add(RepeatVector(max_length))
     model.add(
         LSTM(
-            latent_size, return_sequences=True, name='de_LSTM_1',
+            latent_size * 2, return_sequences=True, name='de_LSTM_1',
             dropout_W=0.2, dropout_U=0.3
         )
     )
