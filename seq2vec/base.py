@@ -50,7 +50,7 @@ class TrainableInterfaceMixin(object):
     """Base Trainable sequence-to-vector class."""
 
     def fit(self, train_seqs, predict_seqs=None, verbose=1,
-            nb_epoch=2, validation_split=0.2):
+            epochs=2, validation_split=0.2):
         train_x = self.input_transformer(train_seqs)
         if predict_seqs is None:
             train_y = self.output_transformer(train_seqs)
@@ -60,22 +60,20 @@ class TrainableInterfaceMixin(object):
         self.model.fit(
             train_x, train_y,
             verbose=verbose,
-            nb_epoch=nb_epoch,
+            epochs=epochs,
             validation_split=validation_split,
         )
 
 
     def fit_generator(self, train_file_generator, test_file_generator,
-                      verbose=1, nb_epoch=2, batch_number=1024):
-        training_sample_num = train_file_generator.batch_size * batch_number
-        testing_sample_num = test_file_generator.batch_size * batch_number
+                      verbose=1, epochs=2, batch_number=1024):
         self.model.fit_generator(
             train_file_generator,
-            samples_per_epoch=training_sample_num,
+            steps_per_epoch=batch_number,
             validation_data=test_file_generator,
-            nb_val_samples=testing_sample_num,
+            validation_steps=batch_number,
             verbose=verbose,
-            nb_epoch=nb_epoch,
+            epochs=epochs,
         )
 
     def transform(self, seqs):

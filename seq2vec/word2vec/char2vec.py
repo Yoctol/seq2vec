@@ -23,13 +23,13 @@ def _create_char2vec_model(
     model.add(
         Embedding(
             max_index, embedding_size, input_length=max_length,
-            name='embedding', mask_zero=True, dropout=0.2
+            name='embedding', mask_zero=True
         )
     )
     model.add(
         LSTM(
-            output_dim=word2vec_size, return_sequences=False,
-            name='LSTM_1', dropout_W=0.2, dropout_U=0.3
+            units=word2vec_size, return_sequences=False,
+            name='LSTM_1', dropout=0.2, recurrent_dropout=0.3
         )
     )
 

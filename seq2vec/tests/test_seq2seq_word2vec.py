@@ -33,7 +33,7 @@ class TestSeq2vecWord2vecClass(TestCase):
     def test_fit(self):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
-        self.assertEqual(result.shape[1], self.latent_size)
+        self.assertEqual(result.shape[1], self.latent_size * 2)
 
     def test_load_save_model(self):
         model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
@@ -72,7 +72,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
 
         result = self.model(self.train_seq)
-        self.assertEqual(result.shape[1], self.latent_size)
+        self.assertEqual(result.shape[1], self.latent_size * 2)
 
 class TestSeq2SeqWord2vecTransformerClass(TestCase):
 

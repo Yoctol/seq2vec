@@ -36,8 +36,8 @@ def _create_single_layer_seq2seq_model(
     )
     model.add(
         LSTM(
-            output_dim=latent_size, return_sequences=False,
-            name='en_LSTM_1', dropout_W=0.2, dropout_U=0.3
+            units=latent_size, return_sequences=False,
+            name='en_LSTM_1', dropout=0.2, recurrent_dropout=0.3
         )
     )
     model.add(
@@ -46,7 +46,7 @@ def _create_single_layer_seq2seq_model(
     model.add(
         LSTM(
             embedding_size, return_sequences=True,
-            name='de_LSTM_1', dropout_W=0.2, dropout_U=0.3
+            name='de_LSTM_1', dropout=0.2, recurrent_dropout=0.3
         )
     )
     model.add(
@@ -168,4 +168,4 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         self.max_index = self.model.get_layer('embedding').input_dim - 1
         self.max_length = self.model.input_shape[1]
         self.embedding_size = self.model.get_layer('embedding').output_dim
-        self.latent_size = self.model.get_layer('en_LSTM_1').output_dim
+        self.latent_size = self.model.get_layer('en_LSTM_1').units
