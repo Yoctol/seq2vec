@@ -33,7 +33,6 @@ def _create_single_layer_seq2seq_model(
         Bidirectional(
             LSTM(
                 latent_size, return_sequences=False, name='en_LSTM_1',
-                dropout_W=0.2, dropout_U=0.3
             )
         )
     )
@@ -41,7 +40,7 @@ def _create_single_layer_seq2seq_model(
     model.add(
         LSTM(
             latent_size * 2, return_sequences=True, name='de_LSTM_1',
-            dropout_W=0.2, dropout_U=0.3
+            dropout=0.2, recurrent_dropout=0.3
         )
     )
     model.add(
