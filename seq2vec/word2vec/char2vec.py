@@ -28,7 +28,7 @@ def _create_char2vec_model(
     )
     model.add(
         LSTM(
-            output_dim=word2vec_size(), return_sequences=False,
+            output_dim=word2vec_size, return_sequences=False,
             name='LSTM_1', dropout_W=0.2, dropout_U=0.3
         )
     )
@@ -44,17 +44,16 @@ def _create_char2vec_model(
         rho=rho,
         decay=decay,
     )
-    model.compile(loss='mean_square_error', optimizer=optimizer)
+    model.compile(loss='mean_squared_error', optimizer=optimizer)
     return model, encoder
 
-class Char2vecInputTransformer(BaseTransformer):
+class Char2vecSeqTransformer(BaseTransformer):
 
     def __init__(self, dictionary, max_length):
         self.max_length = max_length
         self.dictionary = dictionary
 
-    def seq_transform(self, seq):
-        word = ''.join(seq)
+    def seq_transform(self, word):
         transformed_seq = []
         for char in word:
             transformed_seq.append(self.dictionary[char])
@@ -66,6 +65,22 @@ class Char2vecInputTransformer(BaseTransformer):
         )
         return array
 
+class Char2vecInputTransformer(BaseTransformer):
+
+    def __init__(self, dictionary, max_length):
+        self.seq_transformer = Char2vecSeqTransformer(
+            dictionary=dictionary, max_length=max_length
+        )
+
+    def seq_transform(self, seq):
+        return self.seq_transformer(seq)
+
+    def __call__(self, seqs):
+        array = self.seq_transform(seqs[0])
+        for seq in seqs[1:]:
+            array = np.append(array, self.seq_transform(seq), axis=0)
+        return array
+
 class Char2vecOutputTransformer(BaseTransformer):
 
     def __init__(self, word2vec):
@@ -73,21 +88,26 @@ class Char2vecOutputTransformer(BaseTransformer):
         self.zeros = np.zeros(self.word2vec.get_size())
 
     def seq_transform(self, seq):
-        word = ''.join(seq)
-        word_array = self.zeros
+        transformed_seq = []
 
-        try:
-            word_array = self.word2vec[word]
-            normalize(word_array, copy=False)
-        except KeyError:
-            pass
-        return [word_array]
+        feature_size = self.word2vec.get_size()
+        for word in seq:
+            word_array = self.zeros
+
+            try:
+                word_array = self.word2vec[word]
+                normalize(word_array.reshape(1, -1), copy=False)
+            except KeyError:
+                pass
+
+            transformed_seq.append(word_array.reshape(feature_size))
+        return transformed_seq
 
     def __call__(self, seqs):
-        array = generate_padding_array(
-            seqs, self.seq_transform, self.zeros, 1, inverse=False
-        )
-        return array.reshape((len(seqs), self.word2vec.get_size()))
+        array_list = []
+        for seq in seqs:
+            array_list += self.seq_transform(seq)
+        return np.array(array_list)
 
 class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
 
@@ -105,8 +125,8 @@ class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
             learning_rate=learning_rate
         )
 
-        self.input_transform = Char2vecInputTransformer(dictionary, max_length)
-        self.output_transform = Char2vecOutputTransformer(word2vec)
+        self.input_transformer = Char2vecInputTransformer(dictionary, max_length)
+        self.output_transformer = Char2vecOutputTransformer(word2vec)
 
     def load_model(self, file_path):
         self.model = keras.models.load_model(file_path)
@@ -115,3 +135,20 @@ class Char2vec(BaseWord2vecClass, BaseSeq2Vec, TrainableInterfaceMixin):
         )
         self.max_length = self.model.input_shape[1]
         self.embedding_size = self.model.get_layer('embedding').output_dim
+
+    def get_size(self):
+        return self.embedding_size
+
+    def __getitem__(self, key):
+        return self.transform([[key]]).reshape(self.get_size())
+
+    def transform(self, seqs):
+        test_x = self.input_transformer(seqs)
+        prediction_seqs = self.encoder.predict(test_x)
+        prediction = []
+        for seq in prediction_seqs:
+            prediction.append(seq[-1, :])
+        return np.array(prediction)
+
+    def __call__(self, seqs):
+        return self.transform(seqs)
