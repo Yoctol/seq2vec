@@ -29,13 +29,22 @@ def _create_cnn3D_auto_encoder_model(
 
     input_img = Input(shape=(max_length, max_length, embedding_size, 1))
 
-    x = Conv3D(32, (2, 2, conv_size), activation='relu', padding='valid')(input_img)
-    #x = MaxPooling3D((2, 2, 5), padding='valid')(x)
-    x = Conv3D(16, (2, 2, conv_size), activation='relu', padding='valid')(x)
-    #x = MaxPooling3D((2, 2, 5), padding='valid')(x)
-    encoded = Conv3D(8, (2, 2, conv_size), activation=None, padding='valid')(x)
+    #x = Reshape((max_length * max_length, embedding_size))(input_img)
+    #x = Masking(mask_value=0.0)(x)
+    #x = Reshape((max_length, max_length, embedding_size, 1))(x)
 
-    encoded_output = Flatten()(encoded)
+    final_window_size = max_length - 1
+    final_feature_window_size = (embedding_size - conv_size) // 10
+
+    x = Conv3D(
+        10, (2, 2, conv_size), activation='tanh', padding='valid'
+    )(input_img)
+    x = MaxPooling3D(
+        (final_window_size, final_window_size, final_feature_window_size),
+        padding='valid'
+    )(x)
+
+    encoded_output = Flatten()(x)
     decoder_input = RepeatVector(max_length)(encoded_output)
 
     de_LSTM = LSTM(
@@ -69,7 +78,7 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
             try:
                 word_arr = self.word2vec[word]
                 normalize(word_arr.reshape(1, -1), copy=False)
-                transformed_seq.append(word_arr.reshape(self.max_index))
+                transformed_seq.append(word_arr.reshape(self.embedding_size))
             except KeyError:
                 pass
         transformed_array = np.zeros((
@@ -123,7 +132,7 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             conv_size=5,
         ):
-        self.input_transformer = Seq2vecCNNTransformer(
+        self.input_transformer = Seq2vecCNN3DTransformer(
             word2vec_model, max_length
         )
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
