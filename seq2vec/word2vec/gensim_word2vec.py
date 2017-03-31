@@ -15,3 +15,6 @@ class GensimWord2vec(BaseWord2vecClass):
     def get_size(self):
         return self.word2vec.syn0.shape[1]
 
+    def get_index(self, key):
+        return self.word2vec.vocab[key].index
+

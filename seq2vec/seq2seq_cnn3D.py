@@ -10,6 +10,7 @@ from keras.layers.core import Masking, Dense, Flatten, Dropout
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.pooling import MaxPooling3D
 from keras.models import Model
+from keras import regularizers
 from sklearn.preprocessing import normalize
 
 from .base import BaseSeq2Vec
@@ -37,7 +38,8 @@ def _create_cnn3D_auto_encoder_model(
     final_feature_window_size = (embedding_size - conv_size) // 10
 
     x = Conv3D(
-        10, (2, 2, conv_size), activation='tanh', padding='valid'
+        10, (2, 2, conv_size), activation='tanh', padding='valid',
+        kernel_regularizer=regularizers.l2(0.01)
     )(input_img)
     x = MaxPooling3D(
         (final_window_size, final_window_size, final_feature_window_size),
@@ -49,10 +51,18 @@ def _create_cnn3D_auto_encoder_model(
 
     de_LSTM = LSTM(
         latent_size, return_sequences=True, implementation=2,
-        name='de_LSTM_1', unroll=False, dropout=0.2, recurrent_dropout=0.3
+        name='de_LSTM_1', unroll=False, dropout=0.1, recurrent_dropout=0.1,
+        kernel_regularizer=regularizers.l2(0.01),
+        recurrent_regularizer=regularizers.l2(0.01)
     )(decoder_input)
     dense_input = Dropout(0.1)(de_LSTM)
-    output = TimeDistributed(Dense(embedding_size, name='output'))(dense_input)
+    output = TimeDistributed(
+        Dense(
+            embedding_size, name='output',
+            kernel_regularizer=regularizers.l2(0.01),
+            activation='tanh'
+        )
+    )(dense_input)
 
     model = Model(input_img, output)
     encoder = Model(input_img, encoded_output)
