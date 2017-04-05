@@ -55,7 +55,6 @@ def _create_cnn3D_auto_encoder_model(
         padding='valid'
     )(mask_x)
 
-
     encoded_output = Flatten()(mask_x)
     decoder_input = RepeatVector(max_length)(encoded_output)
 
@@ -65,6 +64,7 @@ def _create_cnn3D_auto_encoder_model(
         kernel_regularizer=regularizers.l2(0.001),
         recurrent_regularizer=regularizers.l2(0.001)
     )(decoder_input)
+
     dense_input = Dropout(0.1)(de_LSTM)
     dense_output = TimeDistributed(
         Dense(
