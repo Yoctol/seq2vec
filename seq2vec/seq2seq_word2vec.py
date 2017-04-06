@@ -104,7 +104,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
     def __init__(
             self,
             word2vec_model,
-            max_length,
+            max_length=10,
             learning_rate=0.0001,
             latent_size=20,
         ):

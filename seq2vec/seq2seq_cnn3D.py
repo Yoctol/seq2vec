@@ -191,7 +191,7 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
     def __init__(
             self,
             word2vec_model,
-            max_length,
+            max_length=10,
             latent_size=300,
             learning_rate=0.0001,
             conv_size=5,
