@@ -22,6 +22,9 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.channel_size = 10
         self.latent_size = 100
         self.max_length = 5
+        self.encoding_size = (
+            self.embedding_size // self.conv_size * self.channel_size
+        )
         self.model = Seq2SeqCNN(
             self.word2vec, max_length=self.max_length,
             conv_size=self.conv_size,
@@ -41,7 +44,7 @@ class TestSeq2vecWord2vecClass(TestCase):
     def test_fit(self):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
-        self.assertEqual(result.shape[1], self.embedding_size * 10 // 5)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
     def test_load_save_model(self):
         model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
@@ -62,16 +65,18 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.assertEqual(self.embedding_size, new_model.embedding_size)
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.max_length, new_model.max_length)
+        self.assertEqual(self.encoding_size, new_model.encoding_size)
 
     def test_fit_generator(self):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecCNN3DTransformer(
-            word2vec_model=self.word2vec, max_length=5,
+            word2vec_model=self.word2vec, max_length=self.max_length,
             conv_size=self.conv_size, channel_size=self.channel_size
         )
         y_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model=self.word2vec, max_length=5, inverse=False
+            word2vec_model=self.word2vec,
+            max_length=self.max_length, inverse=False
         )
 
         train_data_generator = DataGenterator(
@@ -86,7 +91,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
 
         result = self.model(self.train_seq)
-        self.assertEqual(result.shape[1], self.embedding_size * 10 // 5)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
 class TestSeq2SeqCNNTransformerClass(TestCase):
 

@@ -17,6 +17,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.latent_size = 20
+        self.encoding_size = self.latent_size * 2
         self.max_length = 5
         self.model = Seq2SeqWord2Vec(
             self.word2vec, max_length=self.max_length,
@@ -52,7 +53,8 @@ class TestSeq2vecWord2vecClass(TestCase):
         result = new_model.transform(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
         self.assertEqual(self.max_length, new_model.max_length)
-        self.assertEqual(self.latent_size * 2, new_model.latent_size)
+        self.assertEqual(self.latent_size, new_model.latent_size)
+        self.assertEqual(self.encoding_size, new_model.encoding_size)
 
     def test_fit_generator(self):
         data_path = join(self.dir_path, 'test_corpus.txt')
