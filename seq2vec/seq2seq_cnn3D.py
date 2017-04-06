@@ -108,6 +108,7 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
                 transformed_seq.append(word_arr.reshape(self.embedding_size))
             except KeyError:
                 pass
+
         transformed_array = np.zeros((
             self.max_length, self.max_length, self.embedding_size
         ))
@@ -125,12 +126,11 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
                         transformed_seq[i] + transformed_seq[j]
                     ) / 2
 
-        return transformed_array.reshape(
+        return seq_length, transformed_array.reshape(
             self.max_length, self.max_length, self.embedding_size, 1
         )
 
-    def gen_input_mask(self, seq):
-        seq_length = len(seq)
+    def gen_input_mask(self, seq_length):
         if seq_length > self.max_length:
             seq_length = self.max_length
 
@@ -145,8 +145,7 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
             mask_input[:, seq_length:, :, :] = -10.0
         return mask_input
 
-    def gen_output_mask(self, seq):
-        seq_length = len(seq)
+    def gen_output_mask(self, seq_length):
         if seq_length > self.max_length:
             seq_length = self.max_length
 
@@ -164,9 +163,10 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
         input_mask_list = []
         output_mask_list = []
         for seq in seqs:
-            array_list.append(self.seq_transform(seq))
-            input_mask_list.append(self.gen_input_mask(seq))
-            output_mask_list.append(self.gen_output_mask(seq))
+            seq_length, transformed_array = self.seq_transform(seq)
+            array_list.append(transformed_array)
+            input_mask_list.append(self.gen_input_mask(seq_length))
+            output_mask_list.append(self.gen_output_mask(seq_length))
         return [
             np.array(array_list), np.array(input_mask_list),
             np.array(output_mask_list)
