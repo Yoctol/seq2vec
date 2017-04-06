@@ -197,6 +197,7 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
             conv_size=5,
             channel_size=10,
         ):
+        self.word2vec_model = word2vec_model
         self.input_transformer = Seq2vecCNN3DTransformer(
             word2vec_model, max_length, conv_size, channel_size
         )
@@ -208,6 +209,7 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         self.learning_rate = learning_rate
         self.conv_size = conv_size
         self.latent_size = latent_size
+        self.channel_size = channel_size
 
         model, encoder = _create_cnn3D_auto_encoder_model(
             max_length=self.max_length,
@@ -228,3 +230,15 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         )
         self.embedding_size = self.model.input_shape[0][3]
         self.max_length = self.model.input_shape[0][1]
+        self.conv_size = self.embedding_size // self.model.input_shape[1][3]
+        self.latent_size = self.model.get_layer(index=9).input_shape[2]
+        self.channel_size = self.model.input_shape[1][4]
+
+        self.input_transformer = Seq2vecCNN3DTransformer(
+            self.word2vec_model, self.max_length,
+            self.conv_size, self.channel_size
+        )
+
+        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+            self.word2vec_model, self.max_length, inverse=False
+        )

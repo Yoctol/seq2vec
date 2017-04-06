@@ -108,6 +108,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             latent_size=20,
         ):
+        self.word2vec_model = word2vec_model
         self.input_transformer = Seq2vecWord2vecSeqTransformer(
             word2vec_model, max_length, True
         )
@@ -136,3 +137,10 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.max_index = self.model.input_shape[2]
         self.max_length = self.model.input_shape[1]
         self.latent_size = self.model.get_layer(index=4).input_dim
+
+        self.input_transformer = Seq2vecWord2vecSeqTransformer(
+            self.word2vec_model, self.max_length, True
+        )
+        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+            self.word2vec_model, self.max_length, False
+        )
