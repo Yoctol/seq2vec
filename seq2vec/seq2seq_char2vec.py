@@ -25,6 +25,7 @@ def _create_char2vec_auto_encoder_model(
         max_index,
         max_length,
         embedding_size,
+        word_embedding_size,
         conv_size,
         latent_size,
         learning_rate,
@@ -80,32 +81,15 @@ def _create_char2vec_auto_encoder_model(
     dense_input = Dropout(0.1)(de_LSTM)
     dense_output = TimeDistributed(
         Dense(
-            embedding_size,
+            word_embedding_size,
             kernel_regularizer=regularizers.l2(0.001),
-            activation='relu'
+            activation='tanh'
         )
     )(dense_input)
 
-    dense_output = Dropout(0.1)(dense_output)
-    dense_output = TimeDistributed(
-        Dense(
-            max_index, name='output',
-            kernel_regularizer=regularizers.l2(0.001),
-            activation='softmax'
-        )
-    )(dense_output)
-
-    mask_output = Input(shape=(max_length, max_index))
+    mask_output = Input(shape=(max_length, word_embedding_size))
 
     output = merge([dense_output, mask_output], mode='mul')
-
-    def my_clip(x, epsilon=1e-8):
-        return K.clip(x[0], epsilon, 1. - epsilon)
-    def _shape(s):
-        return s[0]
-    output = merge([output, output], mode=my_clip, output_shape=_shape)
-
-    #output = Lambda(lambda x: K.clip(x, epsilon, 1. - epsilon))(output)
 
     model = Model([inputs, mask_input, mask_output], output)
     encoder = Model([inputs, mask_input, mask_output], encoded_output)
@@ -115,12 +99,14 @@ def _create_char2vec_auto_encoder_model(
         rho=rho,
         decay=decay,
     )
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer)
+    model.compile(loss='cosine_proximity', optimizer=optimizer)
     return model, encoder
 
 class Seq2vecChar2vecInputTransformer(BaseTransformer):
 
-    def __init__(self, max_index, max_length, embedding_size, conv_size, channel_size):
+    def __init__(self, word2vec, max_index, max_length, embedding_size, conv_size, channel_size):
+        self.word2vec = word2vec
+        self.word_embedding_size = self.word2vec.get_size()
         self.max_index = max_index
         self.max_length = max_length
         self.embedding_size = embedding_size
@@ -160,13 +146,21 @@ class Seq2vecChar2vecInputTransformer(BaseTransformer):
             mask_input[seq_length:, :, :] = -10.0
         return mask_input
 
-    def gen_output_mask(self, seq_length):
+    def gen_output_mask(self, seq):
+        seq_length = 0
+        for word in seq:
+            try:
+                self.word2vec[word]
+                seq_length = seq_length + 1
+            except KeyError:
+                pass
+
         if seq_length > self.max_length:
             seq_length = self.max_length
 
         mask_output = np.ones(
             shape=(
-                self.max_length, self.max_index
+                self.max_length, self.word_embedding_size
             )
         )
         if seq_length < self.max_length:
@@ -181,7 +175,7 @@ class Seq2vecChar2vecInputTransformer(BaseTransformer):
             seq_length, transformed_array = self.seq_transform(seq)
             array_list.append(transformed_array)
             input_mask_list.append(self.gen_input_mask(seq_length))
-            output_mask_list.append(self.gen_output_mask(seq_length))
+            output_mask_list.append(self.gen_output_mask(seq))
         return [
             np.array(array_list), np.array(input_mask_list),
             np.array(output_mask_list)
@@ -189,7 +183,9 @@ class Seq2vecChar2vecInputTransformer(BaseTransformer):
 
 class Seq2vecChar2vecOutputTransformer(BaseTransformer):
 
-    def __init__(self, max_index, max_length, embedding_size, conv_size, channel_size):
+    def __init__(self, word2vec, max_index, max_length, embedding_size, conv_size, channel_size):
+        self.word2vec = word2vec
+        self.word_embedding_size = self.word2vec.get_size()
         self.max_index = max_index
         self.max_length = max_length
         self.embedding_size = embedding_size
@@ -198,21 +194,20 @@ class Seq2vecChar2vecOutputTransformer(BaseTransformer):
         self.channel_size = channel_size
 
     def seq_transform(self, seq):
-        seq = ''.join(seq)
-
-        seq_length = len(seq)
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
         transformed_array = np.zeros((
-            self.max_length, self.max_index
+            self.max_length, self.word_embedding_size
         ))
 
-        for i in range(seq_length):
-            char = seq[i]
-            index = consistent_hash(char) % self.max_index
-            transformed_array[i, index] = 1.0
-
+        seq_length = 0
+        for i, word in enumerate(seq):
+            if seq_length < self.max_length:
+                try:
+                    word_arr = self.word2vec[word]
+                    normalize(word_arr.reshape(1, -1), copy=False)
+                    transformed_array[seq_length, :] = word_arr.reshape(self.embedding_size)
+                    seq_length = seq_length + 1
+                except KeyError:
+                    pass
         return transformed_array
 
     def __call__(self, seqs):
@@ -249,11 +244,12 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
             conv_size=5,
             channel_size=10,
         ):
+        self.word2vec = word2vec_model
         self.input_transformer = Seq2vecChar2vecInputTransformer(
-            max_index, max_length, embedding_size, conv_size, channel_size
+            word2vec_model, max_index, max_length, embedding_size, conv_size, channel_size
         )
         self.output_transformer = Seq2vecChar2vecOutputTransformer(
-            max_index, max_length, embedding_size, conv_size, channel_size
+            word2vec_model, max_index, max_length, embedding_size, conv_size, channel_size
         )
         self.embedding_size = embedding_size
         self.max_length = max_length
@@ -270,6 +266,7 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
             max_index=self.max_index,
             max_length=self.max_length,
             embedding_size=self.embedding_size,
+            word_embedding_size=self.word2vec.get_size(),
             conv_size=self.conv_size,
             latent_size=self.latent_size,
             channel_size=channel_size,
@@ -293,10 +290,10 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.encoding_size = self.encoder.output_shape[1]
 
         self.input_transformer = Seq2vecChar2vecInputTransformer(
-            self.max_index, self.max_length, self.embedding_size,
+            self.word2vec, self.max_index, self.max_length, self.embedding_size,
             self.conv_size, self.channel_size
         )
         self.output_transformer = Seq2vecChar2vecOutputTransformer(
-            self.max_index, self.max_length, self.embedding_size,
+            self.word2vec, self.max_index, self.max_length, self.embedding_size,
             self.conv_size, self.channel_size
         )
