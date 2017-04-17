@@ -46,6 +46,6 @@ class DataGenterator(object):
                         self.batch_size
                     )
             ):
-                assert (len(x_array) == len(y_array)), \
-                    'training data has different length with testing data'
+                #assert (len(x_array) == len(y_array)), \
+                #    'training data has different length with testing data'
                 return (x_array, y_array)
