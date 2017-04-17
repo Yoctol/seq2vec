@@ -18,12 +18,18 @@ class TestSeq2vecWord2vecClass(TestCase):
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.embedding_size = self.word2vec.get_size()
-        self.conv_size=5
-        self.channel_size=10
+        self.conv_size = 5
+        self.channel_size = 10
+        self.latent_size = 100
+        self.max_length = 5
+        self.encoding_size = (
+            self.embedding_size // self.conv_size * self.channel_size
+        )
         self.model = Seq2SeqCNN(
-            self.word2vec, max_length=5,
+            self.word2vec, max_length=self.max_length,
             conv_size=self.conv_size,
-            channel_size=self.channel_size
+            channel_size=self.channel_size,
+            latent_size=self.latent_size
         )
 
         self.train_seq = [
@@ -38,7 +44,7 @@ class TestSeq2vecWord2vecClass(TestCase):
     def test_fit(self):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
-        self.assertEqual(result.shape[1], self.embedding_size * 10 // 5)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
     def test_load_save_model(self):
         model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
@@ -49,21 +55,28 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.model.save_model(model_path)
         new_model = Seq2SeqCNN(
             word2vec_model=self.word2vec,
-            max_length=5
+            max_length=self.max_length
         )
         new_model.load_model(model_path)
         result = new_model.transform(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
+        self.assertEqual(self.conv_size, new_model.conv_size)
+        self.assertEqual(self.channel_size, new_model.channel_size)
+        self.assertEqual(self.embedding_size, new_model.embedding_size)
+        self.assertEqual(self.latent_size, new_model.latent_size)
+        self.assertEqual(self.max_length, new_model.max_length)
+        self.assertEqual(self.encoding_size, new_model.encoding_size)
 
     def test_fit_generator(self):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecCNN3DTransformer(
-            word2vec_model=self.word2vec, max_length=5,
+            word2vec_model=self.word2vec, max_length=self.max_length,
             conv_size=self.conv_size, channel_size=self.channel_size
         )
         y_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model=self.word2vec, max_length=5, inverse=False
+            word2vec_model=self.word2vec,
+            max_length=self.max_length, inverse=False
         )
 
         train_data_generator = DataGenterator(
@@ -78,7 +91,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
 
         result = self.model(self.train_seq)
-        self.assertEqual(result.shape[1], self.embedding_size * 10 // 5)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
 class TestSeq2SeqCNNTransformerClass(TestCase):
 

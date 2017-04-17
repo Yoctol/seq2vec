@@ -108,6 +108,7 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
                 transformed_seq.append(word_arr.reshape(self.embedding_size))
             except KeyError:
                 pass
+
         transformed_array = np.zeros((
             self.max_length, self.max_length, self.embedding_size
         ))
@@ -125,12 +126,11 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
                         transformed_seq[i] + transformed_seq[j]
                     ) / 2
 
-        return transformed_array.reshape(
+        return seq_length, transformed_array.reshape(
             self.max_length, self.max_length, self.embedding_size, 1
         )
 
-    def gen_input_mask(self, seq):
-        seq_length = len(seq)
+    def gen_input_mask(self, seq_length):
         if seq_length > self.max_length:
             seq_length = self.max_length
 
@@ -145,8 +145,7 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
             mask_input[:, seq_length:, :, :] = -10.0
         return mask_input
 
-    def gen_output_mask(self, seq):
-        seq_length = len(seq)
+    def gen_output_mask(self, seq_length):
         if seq_length > self.max_length:
             seq_length = self.max_length
 
@@ -164,9 +163,10 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
         input_mask_list = []
         output_mask_list = []
         for seq in seqs:
-            array_list.append(self.seq_transform(seq))
-            input_mask_list.append(self.gen_input_mask(seq))
-            output_mask_list.append(self.gen_output_mask(seq))
+            seq_length, transformed_array = self.seq_transform(seq)
+            array_list.append(transformed_array)
+            input_mask_list.append(self.gen_input_mask(seq_length))
+            output_mask_list.append(self.gen_output_mask(seq_length))
         return [
             np.array(array_list), np.array(input_mask_list),
             np.array(output_mask_list)
@@ -191,12 +191,13 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
     def __init__(
             self,
             word2vec_model,
-            max_length,
+            max_length=10,
             latent_size=300,
             learning_rate=0.0001,
             conv_size=5,
             channel_size=10,
         ):
+        self.word2vec_model = word2vec_model
         self.input_transformer = Seq2vecCNN3DTransformer(
             word2vec_model, max_length, conv_size, channel_size
         )
@@ -208,6 +209,10 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         self.learning_rate = learning_rate
         self.conv_size = conv_size
         self.latent_size = latent_size
+        self.channel_size = channel_size
+        self.encoding_size = (
+            self.embedding_size // self.conv_size * self.channel_size
+        )
 
         model, encoder = _create_cnn3D_auto_encoder_model(
             max_length=self.max_length,
@@ -228,3 +233,16 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         )
         self.embedding_size = self.model.input_shape[0][3]
         self.max_length = self.model.input_shape[0][1]
+        self.conv_size = self.embedding_size // self.model.input_shape[1][3]
+        self.latent_size = self.model.get_layer(index=9).input_shape[2]
+        self.channel_size = self.model.input_shape[1][4]
+        self.encoding_size = self.encoder.output_shape[1]
+
+        self.input_transformer = Seq2vecCNN3DTransformer(
+            self.word2vec_model, self.max_length,
+            self.conv_size, self.channel_size
+        )
+
+        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+            self.word2vec_model, self.max_length, inverse=False
+        )
