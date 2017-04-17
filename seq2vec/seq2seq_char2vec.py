@@ -236,7 +236,7 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
     def __init__(
             self,
             word2vec_model,
-            max_index=100000,
+            max_index=10000,
             max_length=10,
             embedding_size=300,
             latent_size=300,
