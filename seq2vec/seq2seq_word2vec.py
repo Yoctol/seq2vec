@@ -5,11 +5,12 @@ from keras import backend as K
 import keras.models
 from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.layers import LSTM, RepeatVector
 from keras.layers.core import Masking, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.wrappers import Bidirectional
-from keras.models import Model
+from keras.models import Model, Input
+from keras.regularizers import l2
+from yklz import LSTMEncoder, LSTMDecoder
 from sklearn.preprocessing import normalize
 
 from .base import BaseSeq2Vec
@@ -19,37 +20,52 @@ from .util import generate_padding_array
 
 def _create_single_layer_seq2seq_model(
         max_length,
-        max_index,
+        word_embedding_size,
         latent_size,
         learning_rate,
         rho=0.9,
         decay=0.01,
     ):
-    model = Sequential()
-    model.add(
-        Masking(mask_value=0.0, input_shape=(max_length, max_index))
-    )
-    model.add(
-        Bidirectional(
-            LSTM(
-                latent_size, return_sequences=False, name='en_LSTM_1',
-            )
+    inputs = Input(shape=(max_length, word_embedding_size))
+    masked_inputs = Masking(mask_value=0.0)(inputs)
+    encoded_seq = Bidirectional(
+        LSTMEncoder(
+            output_units=latent_size,
+            use_bias=True,
+            kernel_regularizer=l2(0.001),
+            recurrent_regularizer=l2(0.001),
+            bias_regularizer=l2(0.001),
+            implementation=2,
+            output_activation='tanh',
+            output_dropout=0.1,
+            dropout=0.1,
+            recurrent_dropout=0.1,
         )
-    )
-    model.add(RepeatVector(max_length))
-    model.add(
-        LSTM(
-            latent_size * 2, return_sequences=True, name='de_LSTM_1',
-            dropout=0.2, recurrent_dropout=0.3
+    )(masked_inputs)
+    decoded_seq = LSTMDecoder(
+        output_units=word_embedding_size,
+        return_sequences=True,
+        use_bias=True,
+        kernel_regularizer=l2(0.001),
+        recurrent_regularizer=l2(0.001),
+        bias_regularizer=l2(0.001),
+        implementation=2,
+        output_activation='tanh',
+        output_dropout=0.1,
+        dropout=0.1,
+        recurrent_dropout=0.1,
+    )(encoded_seq)
+    output = TimeDistributed(
+        Dense(
+            word_embedding_size,
+            use_bias=True,
+            activation='tanh',
+            kernel_regularizer=l2(0.001),
+            bias_regularizer=l2(0.001),
         )
-    )
-    model.add(
-        TimeDistributed(
-            Dense(max_index, name='output')
-        )
-    )
-    #encoder = K.function([model.layers[0].input], [model.layers[1].output])
-    encoder = Model(model.input, model.get_layer(index=2).output)
+    )(decoded_seq)
+    model = Model(inputs, output)
+    encoder = Model(inputs, encoded_seq)
 
     optimizer = RMSprop(
         lr=learning_rate,
@@ -63,7 +79,7 @@ class Seq2vecWord2vecSeqTransformer(BaseTransformer):
 
     def __init__(self, word2vec_model, max_length, inverse):
         self.max_length = max_length
-        self.max_index = word2vec_model.get_size()
+        self.word_embedding_size = word2vec_model.get_size()
         self.word2vec = word2vec_model
         self.inverse = inverse
 
@@ -73,14 +89,16 @@ class Seq2vecWord2vecSeqTransformer(BaseTransformer):
             try:
                 word_arr = self.word2vec[word]
                 normalize(word_arr.reshape(1, -1), copy=False)
-                transformed_seq.append(word_arr.reshape(self.max_index))
+                transformed_seq.append(
+                    word_arr.reshape(self.word_embedding_size)
+                )
             except KeyError:
                 pass
         return transformed_seq
 
     def __call__(self, seqs):
         array = generate_padding_array(
-            seqs, self.seq_transform, np.zeros(self.max_index),
+            seqs, self.seq_transform, np.zeros(self.word_embedding_size),
             self.max_length, inverse=self.inverse
         )
         return array
@@ -90,7 +108,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
 
     Attributes
     ----------
-    max_index: int
+    word_embedding_size: int
         The length of input feature
 
     max_length: int
@@ -115,7 +133,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
             word2vec_model, max_length, False
         )
-        self.max_index = word2vec_model.get_size()
+        self.word_embedding_size = word2vec_model.get_size()
         self.max_length = max_length
         self.learning_rate = learning_rate
         self.latent_size = latent_size
@@ -123,21 +141,32 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
 
         model, encoder = _create_single_layer_seq2seq_model(
             max_length=self.max_length,
-            max_index=self.max_index,
+            word_embedding_size=self.word_embedding_size,
             latent_size=self.latent_size,
             learning_rate=self.learning_rate,
         )
         self.model = model
         self.encoder = encoder
 
+    def transform(self, seqs):
+        transformation = super(Seq2SeqWord2Vec, self).transform(seqs)
+        return transformation[:, 0, :]
+
+    def load_customed_model(self, file_path):
+        return keras.models.load_model(
+            file_path, custom_objects={
+                'LSTMEncoder':LSTMEncoder, 'LSTMDecoder':LSTMDecoder
+            }
+        )
+
     def load_model(self, file_path):
-        self.model = keras.models.load_model(file_path)
+        self.model = self.load_customed_model(file_path)
         self.encoder = Model(
             self.model.input, self.model.get_layer(index=2).output
         )
-        self.max_index = self.model.input_shape[2]
+        self.word_embedding_size = self.model.input_shape[2]
         self.max_length = self.model.input_shape[1]
-        self.latent_size = self.model.get_layer(index=4).input_dim // 2
+        self.latent_size = self.model.get_layer(index=3).input_shape[2] // 2
         self.encoding_size = self.latent_size * 2
 
         self.input_transformer = Seq2vecWord2vecSeqTransformer(
