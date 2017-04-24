@@ -5,12 +5,16 @@ from keras import backend as K
 import keras.models
 from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.layers.core import Masking, Dense
+from keras.layers.core import Masking, Dense, Dropout
 from keras.layers.wrappers import TimeDistributed
-from keras.layers.wrappers import Bidirectional
 from keras.models import Model, Input
 from keras.regularizers import l2
-from yklz import LSTMEncoder, LSTMDecoder
+from keras.callbacks import Callback
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ReduceLROnPlateau
+from keras.callbacks import ModelCheckpoint
+from yklz import LSTMEncoder, LSTMDecoder, LSTMCell
+from yklz import Bidirectional_Encoder
 from sklearn.preprocessing import normalize
 
 from .base import BaseSeq2Vec
@@ -24,17 +28,17 @@ def _create_single_layer_seq2seq_model(
         latent_size,
         learning_rate,
         rho=0.9,
-        decay=0.01,
+        decay=0.0,
     ):
     inputs = Input(shape=(max_length, word_embedding_size))
     masked_inputs = Masking(mask_value=0.0)(inputs)
-    encoded_seq = Bidirectional(
+    encoded_seq = Bidirectional_Encoder(
         LSTMEncoder(
             output_units=latent_size,
             use_bias=True,
-            kernel_regularizer=l2(0.001),
-            recurrent_regularizer=l2(0.001),
-            bias_regularizer=l2(0.001),
+            kernel_regularizer=l2(0.0),
+            recurrent_regularizer=l2(0.0),
+            bias_regularizer=l2(0.0),
             implementation=2,
             output_activation='tanh',
             output_dropout=0.1,
@@ -44,27 +48,18 @@ def _create_single_layer_seq2seq_model(
     )(masked_inputs)
     decoded_seq = LSTMDecoder(
         output_units=word_embedding_size,
-        return_sequences=True,
         use_bias=True,
-        kernel_regularizer=l2(0.001),
-        recurrent_regularizer=l2(0.001),
-        bias_regularizer=l2(0.001),
+        kernel_regularizer=l2(0.0),
+        recurrent_regularizer=l2(0.0),
+        bias_regularizer=l2(0.0),
         implementation=2,
         output_activation='tanh',
         output_dropout=0.1,
         dropout=0.1,
         recurrent_dropout=0.1,
     )(encoded_seq)
-    output = TimeDistributed(
-        Dense(
-            word_embedding_size,
-            use_bias=True,
-            activation='tanh',
-            kernel_regularizer=l2(0.001),
-            bias_regularizer=l2(0.001),
-        )
-    )(decoded_seq)
-    model = Model(inputs, output)
+
+    model = Model(inputs, decoded_seq)
     encoder = Model(inputs, encoded_seq)
 
     optimizer = RMSprop(
@@ -77,11 +72,10 @@ def _create_single_layer_seq2seq_model(
 
 class Seq2vecWord2vecSeqTransformer(BaseTransformer):
 
-    def __init__(self, word2vec_model, max_length, inverse):
+    def __init__(self, word2vec_model, max_length):
         self.max_length = max_length
         self.word_embedding_size = word2vec_model.get_size()
         self.word2vec = word2vec_model
-        self.inverse = inverse
 
     def seq_transform(self, seq):
         transformed_seq = []
@@ -99,7 +93,7 @@ class Seq2vecWord2vecSeqTransformer(BaseTransformer):
     def __call__(self, seqs):
         array = generate_padding_array(
             seqs, self.seq_transform, np.zeros(self.word_embedding_size),
-            self.max_length, inverse=self.inverse
+            self.max_length, inverse=False
         )
         return array
 
@@ -126,12 +120,14 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
             learning_rate=0.0001,
             latent_size=20,
         ):
+        super(Seq2SeqWord2Vec, self).__init__()
+
         self.word2vec_model = word2vec_model
         self.input_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model, max_length, True
+            word2vec_model, max_length
         )
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model, max_length, False
+            word2vec_model, max_length
         )
         self.word_embedding_size = word2vec_model.get_size()
         self.max_length = max_length
@@ -148,6 +144,27 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
+        self.best_model_name = 'seq2vec_tokenizer_best'
+        self.reduce_lr = ReduceLROnPlateau(
+            monitor='val_loss',
+            verbose=1,
+            factor=0.3,
+            patience=5,
+            cooldown=3,
+            min_lr=1e-6
+        )
+        self.early_stopping = EarlyStopping(
+            monitor='val_loss',
+            patience=10,
+            verbose=1,
+        )
+        self.model_cp = ModelCheckpoint(
+            self.best_model_name,
+            monitor='val_loss',
+            verbose=1,
+            save_best_only=True,
+        )
+
     def transform(self, seqs):
         transformation = super(Seq2SeqWord2Vec, self).transform(seqs)
         return transformation[:, 0, :]
@@ -155,7 +172,9 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
     def load_customed_model(self, file_path):
         return keras.models.load_model(
             file_path, custom_objects={
-                'LSTMEncoder':LSTMEncoder, 'LSTMDecoder':LSTMDecoder
+                'LSTMEncoder':LSTMEncoder,
+                'LSTMDecoder':LSTMDecoder,
+                'Bidirectional_Encoder':Bidirectional_Encoder
             }
         )
 
@@ -170,8 +189,8 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.encoding_size = self.latent_size * 2
 
         self.input_transformer = Seq2vecWord2vecSeqTransformer(
-            self.word2vec_model, self.max_length, True
+            self.word2vec_model, self.max_length
         )
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            self.word2vec_model, self.max_length, False
+            self.word2vec_model, self.max_length
         )

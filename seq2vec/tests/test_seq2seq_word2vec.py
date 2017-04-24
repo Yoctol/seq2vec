@@ -16,7 +16,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.dir_path = dirname(abspath(__file__))
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
-        self.latent_size = 20
+        self.latent_size = self.word2vec.get_size() // 2
         self.encoding_size = self.latent_size * 2
         self.max_length = 5
         self.model = Seq2SeqWord2Vec(
@@ -47,7 +47,6 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.model.save_model(model_path)
         new_model = Seq2SeqWord2Vec(
             word2vec_model=self.word2vec,
-            max_length=5
         )
         new_model.load_model(model_path)
         result = new_model.transform(self.test_seq)
@@ -60,10 +59,10 @@ class TestSeq2vecWord2vecClass(TestCase):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model=self.word2vec, max_length=5, inverse=True
+            word2vec_model=self.word2vec, max_length=5
         )
         y_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model=self.word2vec, max_length=5, inverse=False
+            word2vec_model=self.word2vec, max_length=5
         )
 
         train_data_generator = DataGenterator(
@@ -87,7 +86,7 @@ class TestSeq2SeqWord2vecTransformerClass(TestCase):
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.input = Seq2vecWord2vecSeqTransformer(
-            word2vec_model=self.word2vec, max_length=5, inverse=False
+            word2vec_model=self.word2vec, max_length=5
         )
         self.seqs = [
             ['我', '有', '一顆', '蘋果'],
