@@ -61,21 +61,6 @@ class TestSeq2vecBaseClass(object):
         result = self.model.transform(self.test_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
 
-    def test_load_save_model(self):
-        self.model.fit(self.train_seq)
-        answer = self.model.transform(self.test_seq)
-
-        self.model.save_model(self.model_path)
-        new_model = self.initialize_model()
-        new_model.load_model(self.model_path)
-
-        result = new_model.transform(self.test_seq)
-        np.testing.assert_array_almost_equal(answer, result)
-
-        self.assertEqual(self.max_length, new_model.max_length)
-        self.assertEqual(self.latent_size, new_model.latent_size)
-        self.assertEqual(self.encoding_size, new_model.encoding_size)
-
     def test_fit_generator(self):
         self.model.fit_generator(
             self.data_generator,

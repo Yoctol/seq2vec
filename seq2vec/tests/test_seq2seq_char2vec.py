@@ -8,7 +8,9 @@ from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
 from seq2vec.seq2seq_char2vec import Seq2SeqChar2vec
 from seq2vec.seq2seq_char2vec import Seq2vecChar2vecInputTransformer
 from seq2vec.seq2seq_char2vec import Seq2vecChar2vecOutputTransformer
+
 from .test_base import TestSeq2vecBaseClass
+from .test_base import TestSeq2vecTransformerBaseClass
 
 class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
 
@@ -81,3 +83,17 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
         self.assertEqual(self.max_index, new_model.max_index)
+
+    def test_input_transformer(self):
+        transformed_input = self.input_transformer(self.train_seq)
+        self.assertEqual(
+            transformed_input[0].shape,
+            (len(self.train_seq), self.max_length, self.max_index)
+        )
+
+    def test_output_transformer(self):
+        transformed_output = self.output_transformer(self.train_seq)
+        self.assertEqual(
+            transformed_output.shape,
+            (len(self.train_seq), self.max_length, self.word2vec.get_size())
+        )
