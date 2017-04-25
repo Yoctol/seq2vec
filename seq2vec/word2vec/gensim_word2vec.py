@@ -18,3 +18,5 @@ class GensimWord2vec(BaseWord2vecClass):
     def get_index(self, key):
         return self.word2vec.vocab[key].index
 
+    def get_vocab_size(self):
+        return len(self.word2vec.vocab)
