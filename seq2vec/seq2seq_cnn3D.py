@@ -202,7 +202,7 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
             word2vec_model, max_length, conv_size, channel_size
         )
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model, max_length, inverse=False
+            word2vec_model, max_length
         )
         self.embedding_size = word2vec_model.get_size()
         self.max_length = max_length
@@ -244,5 +244,5 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         )
 
         self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            self.word2vec_model, self.max_length, inverse=False
+            self.word2vec_model, self.max_length
         )

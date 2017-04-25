@@ -76,7 +76,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
         y_transformer = Seq2vecWord2vecSeqTransformer(
             word2vec_model=self.word2vec,
-            max_length=self.max_length, inverse=False
+            max_length=self.max_length
         )
 
         train_data_generator = DataGenterator(
