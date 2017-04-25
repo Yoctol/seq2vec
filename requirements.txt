@@ -5,4 +5,4 @@ keras
 yoctol_utils
 gensim
 h5py
-yoctol_keras_layer_zoo
+git+https://github.com/Yoctol/yoctol-keras-layer-zoo.git@master
