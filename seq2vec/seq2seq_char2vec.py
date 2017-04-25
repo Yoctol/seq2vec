@@ -204,7 +204,9 @@ class Seq2vecChar2vecOutputTransformer(BaseTransformer):
                 try:
                     word_arr = self.word2vec[word]
                     normalize(word_arr.reshape(1, -1), copy=False)
-                    transformed_array[seq_length, :] = word_arr.reshape(self.embedding_size)
+                    transformed_array[seq_length, :] = word_arr.reshape(
+                        self.word_embedding_size
+                    )
                     seq_length = seq_length + 1
                 except KeyError:
                     pass
