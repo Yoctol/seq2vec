@@ -34,7 +34,7 @@ def _create_single_layer_seq2seq_model(
     masked_inputs = Masking(mask_value=0.0)(inputs)
     encoded_seq = Bidirectional_Encoder(
         LSTMEncoder(
-            output_units=latent_size,
+            units=latent_size,
             use_bias=True,
             kernel_regularizer=l2(0.0),
             recurrent_regularizer=l2(0.0),
@@ -47,7 +47,7 @@ def _create_single_layer_seq2seq_model(
         )
     )(masked_inputs)
     decoded_seq = LSTMDecoder(
-        output_units=word_embedding_size,
+        units=word_embedding_size,
         use_bias=True,
         kernel_regularizer=l2(0.0),
         recurrent_regularizer=l2(0.0),
