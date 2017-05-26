@@ -1,25 +1,22 @@
 """Sequence-to-Sequence word2vec."""
 import numpy as np
 
-import keras.backend as K
 import keras.models
 from keras.optimizers import RMSprop
-from keras.layers import Input, Conv2D
-from keras.layers.embeddings import Embedding
-from keras.layers import LSTM, RepeatVector, Input, Reshape
-from keras.layers.core import Masking, Dense, Flatten, Dropout, Lambda
+from keras.layers import Input, Reshape
+from keras.layers.core import Dense
 from keras.layers.wrappers import TimeDistributed
-from keras.layers.pooling import MaxPooling2D
-from keras.layers import merge
 from keras.models import Model
 from keras import regularizers
 from sklearn.preprocessing import normalize
 
 from yoctol_utils.hash import consistent_hash
+from yklz import Convolution2D, ConvEncoder
+from yklz import Mask2D, MaskToSeq, MaskedMax2DPooling
+from yklz import LSTMDecoder
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
 from .base import BaseTransformer
-from .seq2seq_word2vec import Seq2vecWord2vecSeqTransformer
 
 def _create_char2vec_auto_encoder_model(
         max_index,
@@ -27,7 +24,6 @@ def _create_char2vec_auto_encoder_model(
         embedding_size,
         word_embedding_size,
         conv_size,
-        latent_size,
         learning_rate,
         channel_size,
         rho=0.9,
@@ -44,42 +40,40 @@ def _create_char2vec_auto_encoder_model(
         )
     )(inputs)
 
-    final_window_size = max_length - 1
-    final_feature_size = embedding_size // conv_size
-    final_feature_window_size = 1
-
     char_embedding = Reshape((max_length, embedding_size, 1))(char_embedding)
+    masked_embedding = Mask2D(0.0)(char_embedding)
+    masked_seq = MaskToSeq(Mask2D(0.0))(char_embedding)
 
-    char_feature = Conv2D(
+    char_feature = Convolution2D(
         channel_size, (2, conv_size), strides=(1, conv_size),
         activation='tanh', padding='valid', use_bias=False,
         kernel_regularizer=regularizers.l2(0.001)
-    )(char_embedding)
+    )(masked_embedding)
 
-    mask_input = Input(
-        shape=(
-            final_window_size, final_feature_size, channel_size
-        )
-    )
-    mask_feature = merge([char_feature, mask_input], mode='sum')
+    final_window_size = max_length - 1
+    final_feature_size = channel_size * embedding_size // conv_size
 
-    mask_feature = MaxPooling2D(
-        (final_window_size, final_feature_window_size),
+    mask_feature = MaskedMax2DPooling(
+        (final_window_size, 1),
         padding='valid'
-    )(mask_feature)
+    )(char_feature)
 
-    encoded_output = Flatten()(mask_feature)
-    decoder_input = RepeatVector(max_length)(encoded_output)
+    encoded_feature = ConvEncoder()([mask_feature, masked_seq])
 
-    de_LSTM = LSTM(
-        latent_size, return_sequences=True, implementation=2,
-        name='de_LSTM_1', unroll=False, dropout=0.1, recurrent_dropout=0.1,
+    dense_input = LSTMDecoder(
+        units=final_feature_size,
+        return_sequences=True,
+        implementation=2,
+        name='de_LSTM_1',
+        unroll=False,
+        dropout=0.1,
+        recurrent_dropout=0.1,
+        output_dropout=0.1,
         kernel_regularizer=regularizers.l2(0.001),
-        recurrent_regularizer=regularizers.l2(0.001)
-    )(decoder_input)
+        recurrent_regularizer=regularizers.l2(0.001),
+    )(encoded_feature)
 
-    dense_input = Dropout(0.1)(de_LSTM)
-    dense_output = TimeDistributed(
+    outputs = TimeDistributed(
         Dense(
             word_embedding_size,
             kernel_regularizer=regularizers.l2(0.001),
@@ -87,12 +81,8 @@ def _create_char2vec_auto_encoder_model(
         )
     )(dense_input)
 
-    mask_output = Input(shape=(max_length, word_embedding_size))
-
-    output = merge([dense_output, mask_output], mode='mul')
-
-    model = Model([inputs, mask_input, mask_output], output)
-    encoder = Model([inputs, mask_input, mask_output], encoded_output)
+    model = Model(inputs, outputs)
+    encoder = Model(inputs, encoded_feature)
 
     optimizer = RMSprop(
         lr=learning_rate,
@@ -104,7 +94,15 @@ def _create_char2vec_auto_encoder_model(
 
 class Seq2vecChar2vecInputTransformer(BaseTransformer):
 
-    def __init__(self, word2vec, max_index, max_length, embedding_size, conv_size, channel_size):
+    def __init__(
+        self,
+        word2vec,
+        max_index,
+        max_length,
+        embedding_size,
+        conv_size,
+        channel_size
+    ):
         self.word2vec = word2vec
         self.word_embedding_size = self.word2vec.get_size()
         self.max_index = max_index
@@ -132,58 +130,24 @@ class Seq2vecChar2vecInputTransformer(BaseTransformer):
 
         return seq_length, transformed_array
 
-    def gen_input_mask(self, seq_length):
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        mask_input = np.zeros(
-            shape=(
-                self.mask_window_size, self.mask_feature_size,
-                self.channel_size
-            )
-        )
-        if seq_length < self.max_length:
-            mask_input[seq_length:, :, :] = -10.0
-        return mask_input
-
-    def gen_output_mask(self, seq):
-        seq_length = 0
-        for word in seq:
-            try:
-                self.word2vec[word]
-                seq_length = seq_length + 1
-            except KeyError:
-                pass
-
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        mask_output = np.ones(
-            shape=(
-                self.max_length, self.word_embedding_size
-            )
-        )
-        if seq_length < self.max_length:
-            mask_output[seq_length:, :] = 0.0
-        return mask_output
-
     def __call__(self, seqs):
         array_list = []
-        input_mask_list = []
-        output_mask_list = []
         for seq in seqs:
-            seq_length, transformed_array = self.seq_transform(seq)
+            _, transformed_array = self.seq_transform(seq)
             array_list.append(transformed_array)
-            input_mask_list.append(self.gen_input_mask(seq_length))
-            output_mask_list.append(self.gen_output_mask(seq))
-        return [
-            np.array(array_list), np.array(input_mask_list),
-            np.array(output_mask_list)
-        ]
+        return np.array(array_list)
 
 class Seq2vecChar2vecOutputTransformer(BaseTransformer):
 
-    def __init__(self, word2vec, max_index, max_length, embedding_size, conv_size, channel_size):
+    def __init__(
+        self,
+        word2vec,
+        max_index,
+        max_length,
+        embedding_size,
+        conv_size,
+        channel_size
+    ):
         self.word2vec = word2vec
         self.word_embedding_size = self.word2vec.get_size()
         self.max_index = max_index
@@ -199,7 +163,7 @@ class Seq2vecChar2vecOutputTransformer(BaseTransformer):
         ))
 
         seq_length = 0
-        for i, word in enumerate(seq):
+        for _, word in enumerate(seq):
             if seq_length < self.max_length:
                 try:
                     word_arr = self.word2vec[word]
@@ -241,7 +205,6 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
             max_index=10000,
             max_length=10,
             embedding_size=300,
-            latent_size=300,
             learning_rate=0.0001,
             conv_size=5,
             channel_size=10,
@@ -258,7 +221,6 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.max_index = max_index
         self.learning_rate = learning_rate
         self.conv_size = conv_size
-        self.latent_size = latent_size
         self.channel_size = channel_size
         self.encoding_size = (
             self.embedding_size // self.conv_size * self.channel_size
@@ -270,26 +232,40 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
             embedding_size=self.embedding_size,
             word_embedding_size=self.word2vec.get_size(),
             conv_size=self.conv_size,
-            latent_size=self.latent_size,
             channel_size=channel_size,
             learning_rate=self.learning_rate,
         )
         self.model = model
         self.encoder = encoder
 
+    def transform(self, seqs):
+        test_x = self.input_transformer(seqs)
+        return self.encoder.predict(test_x)[:, 0, :]
+
+    def load_customed_model(self, file_path):
+        return keras.models.load_model(
+            file_path, custom_objects={
+                'LSTMDecoder': LSTMDecoder,
+                'Mask2D': Mask2D,
+                'MaskToSeq': MaskToSeq,
+                'MaskedMax2DPooling': MaskedMax2DPooling,
+                'Convolution2D': Convolution2D,
+                'ConvEncoder': ConvEncoder,
+            }
+        )
+
     def load_model(self, file_path):
-        self.model = keras.models.load_model(file_path)
+        self.model = self.load_customed_model(file_path)
         encoded_output = self.model.get_layer(index=7).output
         self.encoder = Model(
             self.model.input, encoded_output
         )
         self.embedding_size = self.model.get_layer(index=1).output_shape[2]
         self.max_length = self.model.get_layer(index=0).output_shape[1]
-        self.max_index = self.model.input_shape[0][2]
-        self.conv_size = self.embedding_size // self.model.input_shape[1][2]
-        self.latent_size = self.model.get_layer(index=9).output_shape[2]
-        self.channel_size = self.model.input_shape[1][3]
-        self.encoding_size = self.encoder.output_shape[1]
+        self.max_index = self.model.input_shape[2]
+        self.conv_size = self.embedding_size // self.model.get_layer(index=4).output_shape[2]
+        self.channel_size = self.model.get_layer(index=4).output_shape[3]
+        self.encoding_size = self.encoder.output_shape[2]
 
         self.input_transformer = Seq2vecChar2vecInputTransformer(
             self.word2vec, self.max_index, self.max_length, self.embedding_size,

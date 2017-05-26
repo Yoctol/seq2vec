@@ -25,7 +25,7 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         self.channel_size = 10
         self.latent_size = 100
         self.encoding_size = (
-            self.embedding_size // self.conv_size * self.channel_size
+            self.channel_size * self.embedding_size // self.conv_size
         )
 
         super(TestSeq2vecChar2vecClass, self).setUp(
@@ -41,7 +41,6 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
             embedding_size=self.embedding_size,
             conv_size=self.conv_size,
             channel_size=self.channel_size,
-            latent_size=self.latent_size
         )
 
     def initialize_input_transformer(self):
@@ -79,7 +78,6 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         self.assertEqual(self.conv_size, new_model.conv_size)
         self.assertEqual(self.channel_size, new_model.channel_size)
         self.assertEqual(self.embedding_size, new_model.embedding_size)
-        self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
         self.assertEqual(self.max_index, new_model.max_index)
@@ -87,7 +85,7 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
     def test_input_transformer(self):
         transformed_input = self.input_transformer(self.train_seq)
         self.assertEqual(
-            transformed_input[0].shape,
+            transformed_input.shape,
             (len(self.train_seq), self.max_length, self.max_index)
         )
 

@@ -2,7 +2,11 @@
 from abc import abstractmethod
 
 import numpy as np
-
+from keras.models import load_model
+from keras.callbacks import Callback
+from keras.callbacks import EarlyStopping
+from keras.callbacks import ReduceLROnPlateau
+from keras.callbacks import ModelCheckpoint
 
 class BaseSeq2Vec(object):
     """Base sequence-to-vector class."""
@@ -74,7 +78,9 @@ class TrainableInterfaceMixin(object):
             validation_steps=batch_number,
             verbose=verbose,
             epochs=epochs,
+            #callbacks=[self.reduce_lr, self.early_stopping, self.model_cp]
         )
+        #self.model = self.load_customed_model(self.best_model_name)
 
     def transform(self, seqs):
         test_x = self.input_transformer(seqs)
@@ -88,6 +94,9 @@ class TrainableInterfaceMixin(object):
 
     def save_model(self, file_path):
         self.model.save(file_path)
+
+    def load_customed_model(self, file_path):
+        return load_model(file_path)
 
     def fit_transform(self, seqs):
         self.fit(seqs)
