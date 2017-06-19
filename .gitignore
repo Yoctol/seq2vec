@@ -87,3 +87,11 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# model files
+*.h5
+*.model
+*_best
+
+#dict
+*.dict

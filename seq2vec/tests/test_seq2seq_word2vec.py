@@ -16,12 +16,14 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.dir_path = dirname(abspath(__file__))
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
-        self.latent_size = self.word2vec.get_size() // 2
-        self.encoding_size = self.latent_size * 2
+        self.latent_size = 20
+        self.encoding_size = 60
         self.max_length = 5
         self.model = Seq2SeqWord2Vec(
-            self.word2vec, max_length=self.max_length,
-            latent_size=self.latent_size
+            self.word2vec,
+            max_length=self.max_length,
+            latent_size=self.latent_size,
+            encoding_size=self.encoding_size
         )
 
         self.train_seq = [
@@ -36,7 +38,7 @@ class TestSeq2vecWord2vecClass(TestCase):
     def test_fit(self):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
-        self.assertEqual(result.shape[1], self.latent_size * 2)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
     def test_load_save_model(self):
         model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
@@ -77,7 +79,7 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
 
         result = self.model(self.train_seq)
-        self.assertEqual(result.shape[1], self.latent_size * 2)
+        self.assertEqual(result.shape[1], self.encoding_size)
 
 class TestSeq2SeqWord2vecTransformerClass(TestCase):
 
@@ -117,3 +119,4 @@ class TestSeq2SeqWord2vecTransformerClass(TestCase):
                 except KeyError:
                     pass
         np.testing.assert_array_almost_equal(answer, self.input(self.seqs))
+
