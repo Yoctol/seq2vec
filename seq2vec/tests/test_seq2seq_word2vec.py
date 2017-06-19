@@ -1,5 +1,6 @@
 '''Test Sequence to vector using word2vec model'''
 from unittest import TestCase
+from unittest.mock import patch
 from os.path import abspath, dirname, join
 
 import numpy as np
@@ -35,12 +36,14 @@ class TestSeq2vecWord2vecClass(TestCase):
             ['我', '愛', '吃', '鳳梨'],
         ]
 
-    def test_fit(self):
+    @patch('keras.models.Model.fit')
+    def test_fit(self, _):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
 
-    def test_load_save_model(self):
+    @patch('keras.models.Model.fit')
+    def test_load_save_model(self, _):
         model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
 
         self.model.fit(self.train_seq)
@@ -57,7 +60,8 @@ class TestSeq2vecWord2vecClass(TestCase):
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
 
-    def test_fit_generator(self):
+    @patch('keras.models.Model.fit_generator')
+    def test_fit_generator(self, _):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecWord2vecSeqTransformer(

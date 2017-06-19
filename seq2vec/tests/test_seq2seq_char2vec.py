@@ -1,5 +1,6 @@
 '''Test Sequence to vector using word2vec model'''
 from unittest import TestCase
+from unittest.mock import patch
 from os.path import abspath, dirname, join
 
 import numpy as np
@@ -63,7 +64,8 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
             channel_size=self.channel_size
         )
 
-    def test_load_save_model(self):
+    @patch('keras.models.Model.fit')
+    def test_load_save_model(self, _):
         self.model.fit(self.train_seq)
         answer = self.model.transform(self.test_seq)
 

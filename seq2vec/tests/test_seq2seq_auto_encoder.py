@@ -1,5 +1,6 @@
 """Test Sequence-to-Sequence auto encoder."""
 from unittest import TestCase
+from unittest.mock import patch
 from os.path import abspath
 from os.path import dirname
 from os.path import join
@@ -34,12 +35,14 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
         current_path = abspath(__file__)
         self.dir_path = dirname(current_path)
 
-    def test_correct_latent_size(self):
+    @patch('keras.models.Model.fit')
+    def test_correct_latent_size(self, _):
         self.transformer.fit(self.train_seq)
         result = self.transformer.transform(self.test_seq)
         self.assertEqual(result.shape[1], self.latent_size)
 
-    def test_load_save_model(self):
+    @patch('keras.models.Model.fit')
+    def test_load_save_model(self, _):
         model_path = join(self.dir_path, 'auto_encoder_model.h5')
 
         self.transformer.fit(self.train_seq)
@@ -54,7 +57,8 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
         result = new_model.transform(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
 
-    def test_fit_generator(self):
+    @patch('keras.models.Model.fit_generator')
+    def test_fit_generator(self, _):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecAutoEncoderInputTransformer(

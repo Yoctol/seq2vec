@@ -1,5 +1,6 @@
 '''Test base class'''
 from unittest import TestCase
+from unittest.mock import patch
 from abc import abstractmethod
 from os.path import abspath, dirname, join
 
@@ -56,12 +57,14 @@ class TestSeq2vecBaseClass(object):
     def initialize_output_transformer(self):
         pass
 
-    def test_fit(self):
+    @patch('keras.models.Model.fit')
+    def test_fit(self, _):
         self.model.fit(self.train_seq)
         result = self.model.transform(self.test_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
 
-    def test_fit_generator(self):
+    @patch('keras.models.Model.fit_generator')
+    def test_fit_generator(self, _):
         self.model.fit_generator(
             self.data_generator,
             self.data_generator,

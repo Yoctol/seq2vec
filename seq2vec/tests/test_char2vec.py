@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import patch
 from os.path import abspath, dirname, join
 
 import numpy as np
@@ -32,7 +33,8 @@ class TestChar2vecClass(TestCase):
 
         self.model = Char2vec(self.word2vec, 32, 2, self.dictionary)
 
-    def test_save_and_load(self):
+    @patch('keras.models.Model.fit')
+    def test_save_and_load(self, _):
         model_path = join(self.current_dir, 'test_char2vec.model')
 
         self.model.fit(self.train_seqs)
