@@ -14,6 +14,8 @@ from keras.models import Model
 from keras import regularizers
 from sklearn.preprocessing import normalize
 
+from yklz import MaskConv, MaskConvNet, MaskPooling, ConvEncoder
+from yklz import MaskToSeq, RNNDecoder, RNNCell, LSTMPeephole
 from .base import BaseSeq2Vec
 from .base import TrainableInterfaceMixin
 from .base import BaseTransformer
@@ -27,59 +29,67 @@ def _create_cnn3D_auto_encoder_model(
         learning_rate,
         channel_size,
         rho=0.9,
-        decay=0.01,
+        decay=0.0,
     ):
 
-    input_img = Input(shape=(max_length, max_length, embedding_size, 1))
+    inputs = Input(shape=(max_length, max_length, embedding_size, 1))
 
     final_window_size = max_length - 1
-    final_feature_size = embedding_size // conv_size
+    final_feature_size = embedding_size // conv_size * channel_size
     final_feature_window_size = 1
 
-    x = Conv3D(
-        channel_size, (2, 2, conv_size), strides=(1, 1, conv_size),
-        activation='tanh', padding='valid', use_bias=False,
-        kernel_regularizer=regularizers.l2(0.001)
-    )(input_img)
+    masked_inputs = MaskConv(0.0)(inputs)
+    masked_seqs = MaskToSeq(
+        MaskConv(0.0),
+        1
+    )(inputs)
 
-    mask_input = Input(
-        shape=(
-            final_window_size, final_window_size,
-            final_feature_size, channel_size
+    conv = MaskConvNet(
+        Conv3D(
+            channel_size, (2, 2, conv_size), strides=(1, 1, conv_size),
+            activation='tanh', padding='valid', use_bias=False,
+            kernel_regularizer=regularizers.l2(0.001)
         )
+    )(masked_inputs)
+
+    pooling = MaskPooling(
+        MaxPooling3D(
+            (final_window_size, final_window_size, final_feature_window_size),
+            padding='valid'
+        ),
+        pool_mode='max'
+    )(conv)
+
+    encoded = ConvEncoder()(
+        [pooling, masked_seqs]
     )
-    mask_x = merge([x, mask_input], mode='sum')
 
-    mask_x = MaxPooling3D(
-        (final_window_size, final_window_size, final_feature_window_size),
-        padding='valid'
-    )(mask_x)
+    decoded = RNNDecoder(
+        RNNCell(
+            LSTMPeephole(
+                latent_size, return_sequences=True, implementation=2,
+                unroll=False, dropout=0.1, recurrent_dropout=0.1,
+                kernel_regularizer=regularizers.l2(0.001),
+                recurrent_regularizer=regularizers.l2(0.001)
+            ),
+            Dense(
+                units=final_feature_size,
+                activation='tanh'
+            ),
+            dense_dropout=0.1
+        )
+    )(encoded)
 
-    encoded_output = Flatten()(mask_x)
-    decoder_input = RepeatVector(max_length)(encoded_output)
-
-    de_LSTM = LSTM(
-        latent_size, return_sequences=True, implementation=2,
-        name='de_LSTM_1', unroll=False, dropout=0.1, recurrent_dropout=0.1,
-        kernel_regularizer=regularizers.l2(0.001),
-        recurrent_regularizer=regularizers.l2(0.001)
-    )(decoder_input)
-
-    dense_input = Dropout(0.1)(de_LSTM)
-    dense_output = TimeDistributed(
+    outputs = TimeDistributed(
         Dense(
-            embedding_size, name='output',
+            embedding_size,
             kernel_regularizer=regularizers.l2(0.001),
             activation='tanh'
         )
-    )(dense_input)
+    )(decoded)
 
-    mask_output = Input(shape=(max_length, embedding_size))
-
-    output = merge([dense_output, mask_output], mode='mul')
-
-    model = Model([input_img, mask_input, mask_output], output)
-    encoder = Model([input_img, mask_input, mask_output], encoded_output)
+    model = Model(inputs, outputs)
+    encoder = Model(inputs, encoded)
 
     optimizer = RMSprop(
         lr=learning_rate,
@@ -130,47 +140,12 @@ class Seq2vecCNN3DTransformer(BaseTransformer):
             self.max_length, self.max_length, self.embedding_size, 1
         )
 
-    def gen_input_mask(self, seq_length):
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        mask_input = np.zeros(
-            shape=(
-                self.mask_window_size, self.mask_window_size,
-                self.mask_feature_size, self.channel_size
-            )
-        )
-        if seq_length < self.max_length:
-            mask_input[seq_length:, :, :, :] = -10.0
-            mask_input[:, seq_length:, :, :] = -10.0
-        return mask_input
-
-    def gen_output_mask(self, seq_length):
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        mask_output = np.ones(
-            shape=(
-                self.max_length, self.embedding_size
-            )
-        )
-        if seq_length < self.max_length:
-            mask_output[seq_length:, :] = 0.0
-        return mask_output
-
     def __call__(self, seqs):
         array_list = []
-        input_mask_list = []
-        output_mask_list = []
         for seq in seqs:
             seq_length, transformed_array = self.seq_transform(seq)
             array_list.append(transformed_array)
-            input_mask_list.append(self.gen_input_mask(seq_length))
-            output_mask_list.append(self.gen_output_mask(seq_length))
-        return [
-            np.array(array_list), np.array(input_mask_list),
-            np.array(output_mask_list)
-        ]
+        return np.array(array_list)
 
 class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
     """seq2seq auto-encoder using pretrained word vectors as input.
@@ -225,18 +200,36 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
+    def transform(self, seqs):
+        test_x = self.input_transformer(seqs)
+        return self.encoder.predict(test_x)[:, 0, :]
+
+    def load_customed_model(self, file_path):
+        return keras.models.load_model(
+            file_path, custom_objects={
+                'RNNDecoder': RNNDecoder,
+                'MaskPooling': MaskPooling,
+                'MaskToSeq': MaskToSeq,
+                'MaskConv': MaskConv,
+                'MaskConvNet': MaskConvNet,
+                'ConvEncoder': ConvEncoder,
+                'LSTMPeephole':LSTMPeephole,
+                'RNNCell':RNNCell,
+            }
+        )
+
     def load_model(self, file_path):
-        self.model = keras.models.load_model(file_path)
+        self.model = self.load_customed_model(file_path)
         encoded_output = self.model.get_layer(index=5).output
         self.encoder = Model(
             self.model.input, encoded_output
         )
-        self.embedding_size = self.model.input_shape[0][3]
-        self.max_length = self.model.input_shape[0][1]
-        self.conv_size = self.embedding_size // self.model.input_shape[1][3]
-        self.latent_size = self.model.get_layer(index=9).input_shape[2]
-        self.channel_size = self.model.input_shape[1][4]
-        self.encoding_size = self.encoder.output_shape[1]
+        self.embedding_size = self.model.input_shape[3]
+        self.max_length = self.model.input_shape[1]
+        self.conv_size = self.model.get_layer(index=2).layer.kernel_size[2]
+        self.latent_size = self.model.get_layer(index=6).layer.recurrent_layer.units
+        self.channel_size = self.model.get_layer(index=2).layer.filters
+        self.encoding_size = self.encoder.output_shape[2]
 
         self.input_transformer = Seq2vecCNN3DTransformer(
             self.word2vec_model, self.max_length,

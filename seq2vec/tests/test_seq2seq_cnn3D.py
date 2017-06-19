@@ -71,8 +71,10 @@ class TestSeq2vecWord2vecClass(TestCase):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
         x_transformer = Seq2vecCNN3DTransformer(
-            word2vec_model=self.word2vec, max_length=self.max_length,
-            conv_size=self.conv_size, channel_size=self.channel_size
+            word2vec_model=self.word2vec,
+            max_length=self.max_length,
+            conv_size=self.conv_size,
+            channel_size=self.channel_size
         )
         y_transformer = Seq2vecWord2vecSeqTransformer(
             word2vec_model=self.word2vec,
@@ -80,14 +82,22 @@ class TestSeq2vecWord2vecClass(TestCase):
         )
 
         train_data_generator = DataGenterator(
-            data_path, x_transformer, y_transformer, batch_size=10
+            data_path,
+            x_transformer,
+            y_transformer,
+            batch_size=10
         )
         test_data_generator = DataGenterator(
-            data_path, x_transformer, y_transformer, batch_size=10
+            data_path,
+            x_transformer,
+            y_transformer,
+            batch_size=10
         )
 
         self.model.fit_generator(
-            train_data_generator, test_data_generator, batch_number=2
+            train_data_generator,
+            test_data_generator,
+            batch_number=2
         )
 
         result = self.model(self.train_seq)

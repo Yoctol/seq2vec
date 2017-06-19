@@ -165,7 +165,7 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.model = model
         self.encoder = encoder
 
-        self.best_model_name = 'seq2vec_tokenizer_best'
+        self.best_model_name = 'seq2vec_word2vec_best'
         self.reduce_lr = ReduceLROnPlateau(
             monitor='val_loss',
             verbose=1,
