@@ -2,6 +2,7 @@
 from unittest import TestCase
 from unittest.mock import patch
 from os.path import abspath, dirname, join
+import os
 
 import numpy as np
 from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
@@ -83,6 +84,7 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
         self.assertEqual(self.max_index, new_model.max_index)
+        os.remove(self.model_path)
 
     def test_input_transformer(self):
         transformed_input = self.input_transformer(self.train_seq)

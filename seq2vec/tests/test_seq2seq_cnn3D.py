@@ -2,6 +2,7 @@
 from unittest import TestCase
 from unittest.mock import patch
 from os.path import abspath, dirname, join
+import os
 
 import numpy as np
 from sklearn.preprocessing import normalize
@@ -69,6 +70,7 @@ class TestSeq2vecCNNClass(TestCase):
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
+        os.remove(model_path)
 
     @patch('keras.models.Model.fit_generator')
     def test_fit_generator(self, _):

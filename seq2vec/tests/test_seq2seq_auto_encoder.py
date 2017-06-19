@@ -4,6 +4,7 @@ from unittest.mock import patch
 from os.path import abspath
 from os.path import dirname
 from os.path import join
+import os
 
 import numpy as np
 from yoctol_utils.hash import consistent_hash
@@ -56,6 +57,7 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
         new_model.load_model(model_path)
         result = new_model.transform(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
+        os.remove(model_path)
 
     @patch('keras.models.Model.fit_generator')
     def test_fit_generator(self, _):
