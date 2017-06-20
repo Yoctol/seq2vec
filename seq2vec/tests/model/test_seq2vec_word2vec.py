@@ -5,7 +5,6 @@ from os.path import abspath, dirname, join
 import os
 
 import numpy as np
-from sklearn.preprocessing import normalize
 
 from seq2vec.word2vec import GensimWord2vec
 from seq2vec.model import Seq2SeqWord2Vec
@@ -16,7 +15,7 @@ class TestSeq2vecWord2vecClass(TestCase):
 
     def setUp(self):
         self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, 'word2vec.model.bin')
+        word2vec_path = join(self.dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.latent_size = 20
         self.encoding_size = 60
@@ -86,43 +85,3 @@ class TestSeq2vecWord2vecClass(TestCase):
 
         result = self.model(self.train_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
-
-class TestSeq2SeqWord2vecTransformerClass(TestCase):
-
-    def setUp(self):
-        self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, 'word2vec.model.bin')
-        self.word2vec = GensimWord2vec(word2vec_path)
-        self.input = WordEmbeddingTransformer(
-            word2vec_model=self.word2vec, max_length=5
-        )
-        self.seqs = [
-            ['我', '有', '一顆', '蘋果'],
-            ['你', '有', '兩顆', '葡萄']
-        ]
-
-    def test_seq_transform(self):
-        answer = []
-        for word in self.seqs[0]:
-            try:
-                word_array = self.word2vec[word]
-                normalize(word_array.reshape(1, -1), copy=False)
-                answer.append(word_array.reshape(self.word2vec.get_size()))
-            except KeyError:
-                pass
-        np.testing.assert_array_almost_equal(
-            answer, self.input.seq_transform(self.seqs[0])
-        )
-
-    def test_call(self):
-        answer = np.zeros((2, 5, self.word2vec.get_size()))
-        for i, seq in enumerate(self.seqs):
-            for j, word in enumerate(seq):
-                try:
-                    word_array = self.word2vec[word]
-                    normalize(word_array.reshape(1, -1), copy=False)
-                    answer[i, j] = word_array.reshape(self.word2vec.get_size())
-                except KeyError:
-                    pass
-        np.testing.assert_array_almost_equal(answer, self.input(self.seqs))
-

@@ -17,7 +17,7 @@ class TestSeq2vecCNNClass(TestCase):
 
     def setUp(self):
         self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, 'word2vec.model.bin')
+        word2vec_path = join(self.dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.embedding_size = self.word2vec.get_size()
         self.conv_size = 5
@@ -106,24 +106,3 @@ class TestSeq2vecCNNClass(TestCase):
 
         result = self.model(self.train_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
-
-class TestSeq2SeqCNNTransformerClass(TestCase):
-
-    def setUp(self):
-        self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, 'word2vec.model.bin')
-        self.word2vec = GensimWord2vec(word2vec_path)
-        self.transformer = WordEmbeddingConv3DTransformer(
-            word2vec_model=self.word2vec,
-            max_length=5,
-        )
-        self.seqs = [
-            ['我', '有', '一顆', '蘋果'],
-            ['你', '有', '兩顆', '葡萄']
-        ]
-
-    def test_seq_transform(self):
-        pass
-
-    def test_call(self):
-        pass

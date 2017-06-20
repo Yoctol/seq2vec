@@ -12,13 +12,12 @@ from seq2vec.transformer import CharEmbeddingOneHotTransformer
 from seq2vec.transformer import WordEmbeddingTransformer
 
 from .test_seq2vec_base import TestSeq2vecBaseClass
-from .test_seq2vec_base import TestSeq2vecTransformerBaseClass
 
 class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
 
     def setUp(self):
         dir_path = dirname(abspath(__file__))
-        word2vec_path = join(dir_path, 'word2vec.model.bin')
+        word2vec_path = join(dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
 
         self.embedding_size = 300

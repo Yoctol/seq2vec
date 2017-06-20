@@ -73,26 +73,3 @@ class TestSeq2vecBaseClass(object):
 
         result = self.model(self.train_seq)
         self.assertEqual(result.shape[1], self.encoding_size)
-
-class TestSeq2vecTransformerBaseClass(object):
-
-    def setUp(self):
-        self.dir_path = dirname(abspath(__file__))
-        self.transformer = self.initialize_transformer()
-
-        self.seqs = [
-            ['我', '有', '一顆', '蘋果'],
-            ['你', '有', '兩顆', '葡萄']
-        ]
-
-    @abstractmethod
-    def initialize_transformer(self):
-        pass
-
-    @abstractmethod
-    def test_seq_transform(self):
-        pass
-
-    @abstractmethod
-    def test_call(self):
-        pass
