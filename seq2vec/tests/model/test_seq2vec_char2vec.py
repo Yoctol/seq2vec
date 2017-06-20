@@ -12,7 +12,6 @@ from seq2vec.transformer import CharEmbeddingOneHotTransformer
 from seq2vec.transformer import WordEmbeddingTransformer
 
 from .test_seq2vec_base import TestSeq2vecBaseClass
-from .test_seq2vec_base import TestSeq2vecTransformerBaseClass
 
 class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
 
