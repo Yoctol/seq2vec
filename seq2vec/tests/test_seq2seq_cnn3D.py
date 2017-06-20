@@ -7,11 +7,11 @@ import os
 import numpy as np
 from sklearn.preprocessing import normalize
 
-from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
-from seq2vec.seq2seq_cnn3D import Seq2SeqCNN
-from seq2vec.seq2seq_cnn3D import Seq2vecCNN3DTransformer
-from seq2vec.seq2seq_word2vec import Seq2vecWord2vecSeqTransformer
-from seq2vec.data_generator import DataGenterator
+from seq2vec.word2vec import GensimWord2vec
+from seq2vec.model import Seq2SeqCNN
+from seq2vec.transformer import WordEmbeddingConv3DTransformer
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.util import DataGenterator
 
 class TestSeq2vecCNNClass(TestCase):
 
@@ -76,13 +76,11 @@ class TestSeq2vecCNNClass(TestCase):
     def test_fit_generator(self, _):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
-        x_transformer = Seq2vecCNN3DTransformer(
+        x_transformer = WordEmbeddingConv3DTransformer(
             word2vec_model=self.word2vec,
             max_length=self.max_length,
-            conv_size=self.conv_size,
-            channel_size=self.channel_size
         )
-        y_transformer = Seq2vecWord2vecSeqTransformer(
+        y_transformer = WordEmbeddingTransformer(
             word2vec_model=self.word2vec,
             max_length=self.max_length
         )
@@ -115,9 +113,9 @@ class TestSeq2SeqCNNTransformerClass(TestCase):
         self.dir_path = dirname(abspath(__file__))
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
-        self.transformer = Seq2vecCNN3DTransformer(
-            word2vec_model=self.word2vec, max_length=5,
-            conv_size=5, channel_size=1
+        self.transformer = WordEmbeddingConv3DTransformer(
+            word2vec_model=self.word2vec,
+            max_length=5,
         )
         self.seqs = [
             ['我', '有', '一顆', '蘋果'],

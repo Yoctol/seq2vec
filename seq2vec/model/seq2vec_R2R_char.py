@@ -10,12 +10,10 @@ from keras.layers.wrappers import TimeDistributed
 from keras.layers import Dense, Dropout, Activation
 from keras.models import Model
 
-from yoctol_utils.hash import consistent_hash
-
-from .base import BaseSeq2Vec
-from .base import TrainableInterfaceMixin
-from .base import BaseTransformer
-from .util import generate_padding_array
+from seq2vec.transformer import HashIndexTransformer
+from seq2vec.transformer import OneHotEncodedTransformer
+from seq2vec.model import Seq2VecBase
+from seq2vec.model import TrainableInterfaceMixin
 
 def _create_single_layer_seq2seq_model(
         max_length,
@@ -68,52 +66,7 @@ def _create_single_layer_seq2seq_model(
     return model, encoder
 
 
-def _one_hot_encode_seq(seq, max_index):
-    np_seq = []
-    for idx in seq:
-        arr = np.zeros(max_index + 1)
-        arr[idx] = 1
-        np_seq.append(arr)
-    return np_seq
-
-def _hash_seq(sequence, max_index):
-    return [consistent_hash(word) % max_index + 1 for word in sequence]
-
-class Seq2vecAutoEncoderInputTransformer(BaseTransformer):
-
-    def __init__(self, max_index, max_length):
-        self.max_index = max_index
-        self.max_length = max_length
-
-    def seq_transform(self, seq):
-        return _hash_seq(seq, self.max_index)
-
-    def __call__(self, seqs):
-        array = generate_padding_array(
-            seqs, self.seq_transform, 0, self.max_length, inverse=True
-        )
-        return array
-
-class Seq2vecAutoEncoderOutputTransformer(BaseTransformer):
-
-    def __init__(self, max_index, max_length):
-        self.max_index = max_index
-        self.max_length = max_length
-
-    def seq_transform(self, seq):
-        transformed_seq = _one_hot_encode_seq(
-            _hash_seq(seq, self.max_index), self.max_index
-        )
-        return transformed_seq
-
-    def __call__(self, seqs):
-        array = generate_padding_array(
-            seqs, self.seq_transform, np.zeros(self.max_index + 1),
-            self.max_length, inverse=False
-        )
-        return array
-
-class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
+class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, Seq2VecBase):
     """Hash words and feed to seq2seq auto-encoder.
 
     Attributes
@@ -143,10 +96,10 @@ class Seq2SeqAutoEncoderUseWordHash(TrainableInterfaceMixin, BaseSeq2Vec):
         self.embedding_size = embedding_size
         self.latent_size = latent_size
 
-        self.input_transformer = Seq2vecAutoEncoderInputTransformer(
+        self.input_transformer = HashIndexTransformer(
             max_index, max_length
         )
-        self.output_transformer = Seq2vecAutoEncoderOutputTransformer(
+        self.output_transformer = OneHotEncodedTransformer(
             max_index, max_length
         )
 

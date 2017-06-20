@@ -9,10 +9,10 @@ import os
 import numpy as np
 from yoctol_utils.hash import consistent_hash
 
-from ..seq2seq_auto_encoder import Seq2SeqAutoEncoderUseWordHash
-from ..seq2seq_auto_encoder import Seq2vecAutoEncoderInputTransformer
-from ..seq2seq_auto_encoder import Seq2vecAutoEncoderOutputTransformer
-from ..data_generator import DataGenterator
+from seq2vec.model import Seq2SeqAutoEncoderUseWordHash
+from seq2vec.transformer import HashIndexTransformer
+from seq2vec.transformer import OneHotEncodedTransformer
+from seq2vec.util import DataGenterator
 
 class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
 
@@ -63,10 +63,10 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
     def test_fit_generator(self, _):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
-        x_transformer = Seq2vecAutoEncoderInputTransformer(
+        x_transformer = HashIndexTransformer(
             self.max_index, self.max_length
         )
-        y_transformer = Seq2vecAutoEncoderOutputTransformer(
+        y_transformer = OneHotEncodedTransformer(
             self.max_index, self.max_length
         )
 
@@ -87,7 +87,7 @@ class TestSeq2SeqAutoEncoderUseWordHash(TestCase):
 class TestSeq2SeqAutoEncoderInputTransformerClass(TestCase):
 
     def setUp(self):
-        self.input = Seq2vecAutoEncoderInputTransformer(
+        self.input = HashIndexTransformer(
             max_index=10, max_length=5
         )
         self.seqs = [
@@ -98,20 +98,20 @@ class TestSeq2SeqAutoEncoderInputTransformerClass(TestCase):
     def test_seq_transform(self):
         answer = []
         for word in self.seqs[0]:
-            answer.append(consistent_hash(word) % 10 + 1)
+            answer.append(consistent_hash(word) % 9 + 1)
         self.assertEqual(answer, self.input.seq_transform(self.seqs[0]))
 
     def test_call(self):
         answer = np.zeros((2, 5))
         for i, seq in enumerate(self.seqs):
-            for j, word in enumerate(seq[::-1]):
-                answer[i, j + 1] = consistent_hash(word) % 10 + 1
+            for j, word in enumerate(seq):
+                answer[i, j] = consistent_hash(word) % 9 + 1
         np.testing.assert_array_almost_equal(answer, self.input(self.seqs))
 
 class TestSeq2SeqAutoEncoderOutputTransformerClass(TestCase):
 
     def setUp(self):
-        self.output = Seq2vecAutoEncoderOutputTransformer(
+        self.output = OneHotEncodedTransformer(
             max_index=10, max_length=5
         )
         self.seqs = [
@@ -122,8 +122,8 @@ class TestSeq2SeqAutoEncoderOutputTransformerClass(TestCase):
     def test_seq_transform(self):
         answer = []
         for word in self.seqs[0]:
-            index = consistent_hash(word) % 10 + 1
-            zero = np.zeros(11)
+            index = consistent_hash(word) % 9 + 1
+            zero = np.zeros(10)
             zero[index] = 1
             answer.append(zero)
 
@@ -136,11 +136,11 @@ class TestSeq2SeqAutoEncoderOutputTransformerClass(TestCase):
             )
 
     def test_call(self):
-        answer = np.zeros((2, 5, 11))
+        answer = np.zeros((2, 5, 10))
         for i, seq in enumerate(self.seqs):
             for j, word in enumerate(seq):
-                zero = np.zeros(11)
-                index = consistent_hash(word) % 10 + 1
+                zero = np.zeros(10)
+                index = consistent_hash(word) % 9 + 1
                 zero[index] = 1
                 answer[i, j] = zero
         np.testing.assert_array_almost_equal(answer, self.output(self.seqs))

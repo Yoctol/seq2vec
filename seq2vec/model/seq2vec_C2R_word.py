@@ -16,10 +16,10 @@ from sklearn.preprocessing import normalize
 
 from yklz import MaskConv, MaskConvNet, MaskPooling, ConvEncoder
 from yklz import MaskToSeq, RNNDecoder, RNNCell, LSTMPeephole
-from .base import BaseSeq2Vec
-from .base import TrainableInterfaceMixin
-from .base import BaseTransformer
-from .seq2seq_word2vec import Seq2vecWord2vecSeqTransformer
+from seq2vec.transformer import WordEmbeddingConv3DTransformer
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.model import Seq2VecBase
+from seq2vec.model import TrainableInterfaceMixin
 
 def _create_cnn3D_auto_encoder_model(
         max_length,
@@ -99,55 +99,8 @@ def _create_cnn3D_auto_encoder_model(
     model.compile(loss='cosine_proximity', optimizer=optimizer)
     return model, encoder
 
-class Seq2vecCNN3DTransformer(BaseTransformer):
 
-    def __init__(self, word2vec_model, max_length, conv_size, channel_size):
-        self.max_length = max_length
-        self.embedding_size = word2vec_model.get_size()
-        self.word2vec = word2vec_model
-        self.mask_feature_size = self.embedding_size // conv_size
-        self.mask_window_size = self.max_length - 1
-        self.channel_size = channel_size
-
-    def seq_transform(self, seq):
-        transformed_seq = []
-        for word in seq:
-            try:
-                word_arr = self.word2vec[word]
-                normalize(word_arr.reshape(1, -1), copy=False)
-                transformed_seq.append(word_arr.reshape(self.embedding_size))
-            except KeyError:
-                pass
-
-        transformed_array = np.zeros((
-            self.max_length, self.max_length, self.embedding_size
-        ))
-
-        seq_length = len(transformed_seq)
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        for i in range(seq_length):
-            for j in range(seq_length):
-                if i > j:
-                    transformed_array[i, j, :] = transformed_array[j, i, :]
-                else:
-                    transformed_array[i, j, :] = (
-                        transformed_seq[i] + transformed_seq[j]
-                    ) / 2
-
-        return seq_length, transformed_array.reshape(
-            self.max_length, self.max_length, self.embedding_size, 1
-        )
-
-    def __call__(self, seqs):
-        array_list = []
-        for seq in seqs:
-            seq_length, transformed_array = self.seq_transform(seq)
-            array_list.append(transformed_array)
-        return np.array(array_list)
-
-class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
+class Seq2SeqCNN(TrainableInterfaceMixin, Seq2VecBase):
     """seq2seq auto-encoder using pretrained word vectors as input.
 
     Attributes
@@ -173,11 +126,13 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
             channel_size=10,
         ):
         self.word2vec_model = word2vec_model
-        self.input_transformer = Seq2vecCNN3DTransformer(
-            word2vec_model, max_length, conv_size, channel_size
+        self.input_transformer = WordEmbeddingConv3DTransformer(
+            word2vec_model,
+            max_length,
         )
-        self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            word2vec_model, max_length
+        self.output_transformer = WordEmbeddingTransformer(
+            word2vec_model,
+            max_length
         )
         self.embedding_size = word2vec_model.get_size()
         self.max_length = max_length
@@ -231,11 +186,12 @@ class Seq2SeqCNN(TrainableInterfaceMixin, BaseSeq2Vec):
         self.channel_size = self.model.get_layer(index=2).layer.filters
         self.encoding_size = self.encoder.output_shape[2]
 
-        self.input_transformer = Seq2vecCNN3DTransformer(
-            self.word2vec_model, self.max_length,
-            self.conv_size, self.channel_size
+        self.input_transformer = WordEmbeddingConv3DTransformer(
+            self.word2vec_model,
+            self.max_length,
         )
 
-        self.output_transformer = Seq2vecWord2vecSeqTransformer(
-            self.word2vec_model, self.max_length
+        self.output_transformer = WordEmbeddingTransformer(
+            self.word2vec_model,
+            self.max_length
         )

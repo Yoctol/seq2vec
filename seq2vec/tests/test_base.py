@@ -6,7 +6,7 @@ from os.path import abspath, dirname, join
 
 import numpy as np
 
-from seq2vec.data_generator import DataGenterator
+from seq2vec.util import DataGenterator
 
 class TestSeq2vecBaseClass(object):
 

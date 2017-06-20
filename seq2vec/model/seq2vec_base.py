@@ -8,7 +8,7 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ReduceLROnPlateau
 from keras.callbacks import ModelCheckpoint
 
-class BaseSeq2Vec(object):
+class Seq2VecBase(object):
     """Base sequence-to-vector class."""
 
     def __call__(self, seqs):
@@ -101,16 +101,3 @@ class TrainableInterfaceMixin(object):
     def fit_transform(self, seqs):
         self.fit(seqs)
         return self.transform(seqs)
-
-class BaseTransformer(object):
-    """
-        Base transformer to transform seq to input or output of seq2vec model
-    """
-
-    @abstractmethod
-    def seq_transform(self, seq):
-        pass
-
-    @abstractmethod
-    def __call__(self, seqs):
-        pass

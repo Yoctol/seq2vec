@@ -7,10 +7,10 @@ import os
 import numpy as np
 from sklearn.preprocessing import normalize
 
-from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
-from seq2vec.seq2seq_word2vec import Seq2SeqWord2Vec
-from seq2vec.seq2seq_word2vec import Seq2vecWord2vecSeqTransformer
-from seq2vec.data_generator import DataGenterator
+from seq2vec.word2vec import GensimWord2vec
+from seq2vec.model import Seq2SeqWord2Vec
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.util import DataGenterator
 
 class TestSeq2vecWord2vecClass(TestCase):
 
@@ -66,10 +66,10 @@ class TestSeq2vecWord2vecClass(TestCase):
     def test_fit_generator(self, _):
         data_path = join(self.dir_path, 'test_corpus.txt')
 
-        x_transformer = Seq2vecWord2vecSeqTransformer(
+        x_transformer = WordEmbeddingTransformer(
             word2vec_model=self.word2vec, max_length=5
         )
-        y_transformer = Seq2vecWord2vecSeqTransformer(
+        y_transformer = WordEmbeddingTransformer(
             word2vec_model=self.word2vec, max_length=5
         )
 
@@ -93,7 +93,7 @@ class TestSeq2SeqWord2vecTransformerClass(TestCase):
         self.dir_path = dirname(abspath(__file__))
         word2vec_path = join(self.dir_path, 'word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
-        self.input = Seq2vecWord2vecSeqTransformer(
+        self.input = WordEmbeddingTransformer(
             word2vec_model=self.word2vec, max_length=5
         )
         self.seqs = [

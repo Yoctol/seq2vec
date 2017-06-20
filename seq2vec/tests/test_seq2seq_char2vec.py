@@ -7,9 +7,9 @@ import os
 import numpy as np
 from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
 
-from seq2vec.seq2seq_char2vec import Seq2SeqChar2vec
-from seq2vec.seq2seq_char2vec import Seq2vecChar2vecInputTransformer
-from seq2vec.seq2seq_char2vec import Seq2vecChar2vecOutputTransformer
+from seq2vec.model import Seq2SeqChar2vec
+from seq2vec.transformer import CharEmbeddingOneHotTransformer
+from seq2vec.transformer import WordEmbeddingTransformer
 
 from .test_base import TestSeq2vecBaseClass
 from .test_base import TestSeq2vecTransformerBaseClass
@@ -46,23 +46,15 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         )
 
     def initialize_input_transformer(self):
-        return Seq2vecChar2vecInputTransformer(
-            self.word2vec,
+        return CharEmbeddingOneHotTransformer(
             max_index=self.max_index,
             max_length=self.max_length,
-            embedding_size=self.embedding_size,
-            conv_size=self.conv_size,
-            channel_size=self.channel_size
         )
 
     def initialize_output_transformer(self):
-        return Seq2vecChar2vecOutputTransformer(
+        return WordEmbeddingTransformer(
             self.word2vec,
-            max_index=self.max_index,
             max_length=self.max_length,
-            embedding_size=self.embedding_size,
-            conv_size=self.conv_size,
-            channel_size=self.channel_size
         )
 
     @patch('keras.models.Model.fit')

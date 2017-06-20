@@ -16,9 +16,11 @@ from yoctol_utils.hash import consistent_hash
 from yklz import MaskConv, ConvEncoder, MaskConvNet
 from yklz import MaskToSeq, MaskPooling
 from yklz import RNNDecoder, LSTMPeephole, RNNCell
-from .base import BaseSeq2Vec
-from .base import TrainableInterfaceMixin
-from .base import BaseTransformer
+
+from seq2vec.transformer import CharEmbeddingOneHotTransformer
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.model import Seq2VecBase
+from seq2vec.model import TrainableInterfaceMixin
 
 def _create_char2vec_auto_encoder_model(
         max_index,
@@ -109,98 +111,7 @@ def _create_char2vec_auto_encoder_model(
     model.compile(loss='cosine_proximity', optimizer=optimizer)
     return model, encoder
 
-class Seq2vecChar2vecInputTransformer(BaseTransformer):
-
-    def __init__(
-        self,
-        word2vec,
-        max_index,
-        max_length,
-        embedding_size,
-        conv_size,
-        channel_size
-    ):
-        self.word2vec = word2vec
-        self.word_embedding_size = self.word2vec.get_size()
-        self.max_index = max_index
-        self.max_length = max_length
-        self.embedding_size = embedding_size
-        self.mask_feature_size = self.embedding_size // conv_size
-        self.mask_window_size = self.max_length - 1
-        self.channel_size = channel_size
-
-    def seq_transform(self, seq):
-        seq = ''.join(seq)
-
-        seq_length = len(seq)
-        if seq_length > self.max_length:
-            seq_length = self.max_length
-
-        transformed_array = np.zeros((
-            self.max_length, self.max_index
-        ))
-
-        for i in range(seq_length):
-            char = seq[i]
-            index = consistent_hash(char) % self.max_index
-            transformed_array[i, index] = 1.0
-
-        return seq_length, transformed_array
-
-    def __call__(self, seqs):
-        array_list = []
-        for seq in seqs:
-            _, transformed_array = self.seq_transform(seq)
-            array_list.append(transformed_array)
-        return np.array(array_list)
-
-class Seq2vecChar2vecOutputTransformer(BaseTransformer):
-
-    def __init__(
-        self,
-        word2vec,
-        max_index,
-        max_length,
-        embedding_size,
-        conv_size,
-        channel_size
-    ):
-        self.word2vec = word2vec
-        self.word_embedding_size = self.word2vec.get_size()
-        self.max_index = max_index
-        self.max_length = max_length
-        self.embedding_size = embedding_size
-        self.mask_feature_size = self.embedding_size // conv_size
-        self.mask_window_size = self.max_length - 1
-        self.channel_size = channel_size
-
-    def seq_transform(self, seq):
-        transformed_array = np.zeros((
-            self.max_length, self.word_embedding_size
-        ))
-
-        seq_length = 0
-        for _, word in enumerate(seq):
-            if seq_length < self.max_length:
-                try:
-                    word_arr = self.word2vec[word]
-                    normalize(word_arr.reshape(1, -1), copy=False)
-                    transformed_array[seq_length, :] = word_arr.reshape(
-                        self.word_embedding_size
-                    )
-                    seq_length = seq_length + 1
-                except KeyError:
-                    pass
-        return transformed_array
-
-    def __call__(self, seqs):
-        array_list = []
-        for seq in seqs:
-            transformed_array = self.seq_transform(seq)
-            array_list.append(transformed_array)
-        return np.array(array_list)
-
-class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
+class Seq2SeqChar2vec(TrainableInterfaceMixin, Seq2VecBase):
     """seq2seq auto-encoder using pretrained word vectors as input.
 
     Attributes
@@ -228,11 +139,13 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
             latent_size=20,
         ):
         self.word2vec = word2vec_model
-        self.input_transformer = Seq2vecChar2vecInputTransformer(
-            word2vec_model, max_index, max_length, embedding_size, conv_size, channel_size
+        self.input_transformer = CharEmbeddingOneHotTransformer(
+            max_index,
+            max_length,
         )
-        self.output_transformer = Seq2vecChar2vecOutputTransformer(
-            word2vec_model, max_index, max_length, embedding_size, conv_size, channel_size
+        self.output_transformer = WordEmbeddingTransformer(
+            word2vec_model,
+            max_length,
         )
         self.embedding_size = embedding_size
         self.max_length = max_length
@@ -290,11 +203,11 @@ class Seq2SeqChar2vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.encoding_size = self.encoder.output_shape[2]
         self.latent_size = self.model.get_layer(index=8).layer.recurrent_layer.units
 
-        self.input_transformer = Seq2vecChar2vecInputTransformer(
-            self.word2vec, self.max_index, self.max_length, self.embedding_size,
-            self.conv_size, self.channel_size
+        self.input_transformer = CharEmbeddingOneHotTransformer(
+            self.max_index,
+            self.max_length,
         )
-        self.output_transformer = Seq2vecChar2vecOutputTransformer(
-            self.word2vec, self.max_index, self.max_length, self.embedding_size,
-            self.conv_size, self.channel_size
+        self.output_transformer = WordEmbeddingTransformer(
+            self.word2vec,
+            self.max_length,
         )

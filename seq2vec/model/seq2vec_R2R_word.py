@@ -15,12 +15,10 @@ from keras.callbacks import ReduceLROnPlateau
 from keras.callbacks import ModelCheckpoint
 from yklz import RNNDecoder, RNNCell, LSTMPeephole
 from yklz import BidirectionalRNNEncoder
-from sklearn.preprocessing import normalize
 
-from .base import BaseSeq2Vec
-from .base import TrainableInterfaceMixin
-from .base import BaseTransformer
-from .util import generate_padding_array
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.model import Seq2VecBase
+from seq2vec.model import TrainableInterfaceMixin
 
 def _create_single_layer_seq2seq_model(
         max_length,
@@ -89,34 +87,7 @@ def _create_single_layer_seq2seq_model(
     model.compile(loss='cosine_proximity', optimizer=optimizer)
     return model, encoder
 
-class Seq2vecWord2vecSeqTransformer(BaseTransformer):
-
-    def __init__(self, word2vec_model, max_length):
-        self.max_length = max_length
-        self.word_embedding_size = word2vec_model.get_size()
-        self.word2vec = word2vec_model
-
-    def seq_transform(self, seq):
-        transformed_seq = []
-        for word in seq:
-            try:
-                word_arr = self.word2vec[word]
-                normalize(word_arr.reshape(1, -1), copy=False)
-                transformed_seq.append(
-                    word_arr.reshape(self.word_embedding_size)
-                )
-            except KeyError:
-                pass
-        return transformed_seq
-
-    def __call__(self, seqs):
-        array = generate_padding_array(
-            seqs, self.seq_transform, np.zeros(self.word_embedding_size),
-            self.max_length, inverse=False
-        )
-        return array
-
-class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
+class Seq2SeqWord2Vec(TrainableInterfaceMixin, Seq2VecBase):
     """seq2seq auto-encoder using pretrained word vectors as input.
 
     Attributes
@@ -143,10 +114,10 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         super(Seq2SeqWord2Vec, self).__init__()
 
         self.word2vec_model = word2vec_model
-        self.input_transformer = Seq2vecWord2vecSeqTransformer(
+        self.input_transformer = WordEmbeddingTransformer(
             word2vec_model, max_length
         )
-        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+        self.output_transformer = WordEmbeddingTransformer(
             word2vec_model, max_length
         )
         self.word_embedding_size = word2vec_model.get_size()
@@ -210,9 +181,9 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, BaseSeq2Vec):
         self.latent_size = self.model.get_layer(index=2).layer.recurrent_layer.units
         self.encoding_size = self.model.get_layer(index=3).input_shape[2]
 
-        self.input_transformer = Seq2vecWord2vecSeqTransformer(
+        self.input_transformer = WordEmbeddingTransformer(
             self.word2vec_model, self.max_length
         )
-        self.output_transformer = Seq2vecWord2vecSeqTransformer(
+        self.output_transformer = WordEmbeddingTransformer(
             self.word2vec_model, self.max_length
         )
