@@ -17,7 +17,7 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
 
     def setUp(self):
         dir_path = dirname(abspath(__file__))
-        word2vec_path = join(dir_path, 'word2vec.model.bin')
+        word2vec_path = join(dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
 
         self.embedding_size = 300

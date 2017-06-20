@@ -15,7 +15,7 @@ class TestSeq2vecWord2vecClass(TestCase):
 
     def setUp(self):
         self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, 'word2vec.model.bin')
+        word2vec_path = join(self.dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
         self.latent_size = 20
         self.encoding_size = 60
