@@ -1,67 +1,42 @@
 '''Test Sequence to vector using word2vec model'''
 from unittest import TestCase
-from unittest.mock import patch
-from os.path import abspath, dirname, join
 import os
 
 import numpy as np
-from sklearn.preprocessing import normalize
 
-from seq2vec.word2vec import GensimWord2vec
-from seq2vec.model import Seq2SeqCNN
-from seq2vec.transformer import WordEmbeddingConv3DTransformer
-from seq2vec.transformer import WordEmbeddingTransformer
-from seq2vec.util import DataGenterator
+from seq2vec.model import Seq2VecC2RWord
 
-class TestSeq2vecCNNClass(TestCase):
+from .test_seq2vec_base import TestSeq2VecBaseClass
+
+class TestSeq2VecC2RWordClass(TestSeq2VecBaseClass, TestCase):
 
     def setUp(self):
-        self.dir_path = dirname(abspath(__file__))
-        word2vec_path = join(self.dir_path, '../word2vec.model.bin')
-        self.word2vec = GensimWord2vec(word2vec_path)
-        self.embedding_size = self.word2vec.get_size()
         self.conv_size = 5
         self.channel_size = 10
-        self.latent_size = 100
-        self.max_length = 5
+        super(TestSeq2VecC2RWordClass, self).setUp()
+        self.embedding_size = self.word2vec.get_size()
         self.encoding_size = (
             self.embedding_size // self.conv_size * self.channel_size
         )
-        self.model = Seq2SeqCNN(
-            self.word2vec, max_length=self.max_length,
+
+    def create_model(self):
+        return Seq2VecC2RWord(
+            self.word2vec,
+            max_length=self.max_length,
             conv_size=self.conv_size,
             channel_size=self.channel_size,
             latent_size=self.latent_size
         )
 
-        self.train_seq = [
-            ['我', '有', '一個', '蘋果'],
-            ['我', '有', '一支', '筆'],
-            ['我', '有', '一個', '鳳梨'],
-        ]
-        self.test_seq = [
-            ['我', '愛', '吃', '鳳梨'],
-        ]
-
-    @patch('keras.models.Model.fit')
-    def test_fit(self, _):
-        self.model.fit(self.train_seq)
-        result = self.model.transform(self.test_seq)
-        self.assertEqual(result.shape[1], self.encoding_size)
-
-    @patch('keras.models.Model.fit')
-    def test_load_save_model(self, _):
-        model_path = join(self.dir_path, 'seq2vec_word2vec_model.h5')
-
-        self.model.fit(self.train_seq)
+    def test_load_save_model(self):
         answer = self.model.transform(self.test_seq)
 
-        self.model.save_model(model_path)
-        new_model = Seq2SeqCNN(
+        self.model.save_model(self.model_path)
+        new_model = Seq2VecC2RWord(
             word2vec_model=self.word2vec,
             max_length=self.max_length
         )
-        new_model.load_model(model_path)
+        new_model.load_model(self.model_path)
         result = new_model.transform(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
         self.assertEqual(self.conv_size, new_model.conv_size)
@@ -70,39 +45,4 @@ class TestSeq2vecCNNClass(TestCase):
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
-        os.remove(model_path)
-
-    @patch('keras.models.Model.fit_generator')
-    def test_fit_generator(self, _):
-        data_path = join(self.dir_path, 'test_corpus.txt')
-
-        x_transformer = WordEmbeddingConv3DTransformer(
-            word2vec_model=self.word2vec,
-            max_length=self.max_length,
-        )
-        y_transformer = WordEmbeddingTransformer(
-            word2vec_model=self.word2vec,
-            max_length=self.max_length
-        )
-
-        train_data_generator = DataGenterator(
-            data_path,
-            x_transformer,
-            y_transformer,
-            batch_size=10
-        )
-        test_data_generator = DataGenterator(
-            data_path,
-            x_transformer,
-            y_transformer,
-            batch_size=10
-        )
-
-        self.model.fit_generator(
-            train_data_generator,
-            test_data_generator,
-            batch_number=2
-        )
-
-        result = self.model(self.train_seq)
-        self.assertEqual(result.shape[1], self.encoding_size)
+        os.remove(self.model_path)
