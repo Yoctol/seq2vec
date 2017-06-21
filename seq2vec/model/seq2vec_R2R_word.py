@@ -1,93 +1,18 @@
-"""Sequence-to-Sequence word2vec."""
-import numpy as np
-
-from keras import backend as K
+"""Sequence-to-Sequence word embedding and RNN to RNN architecture"""
 import keras.models
-from keras.models import Sequential
 from keras.optimizers import RMSprop
-from keras.layers.core import Masking, Dense, Dropout
+from keras.layers.core import Masking, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model, Input
 from keras.regularizers import l2
-from keras.callbacks import Callback
-from keras.callbacks import EarlyStopping
-from keras.callbacks import ReduceLROnPlateau
-from keras.callbacks import ModelCheckpoint
 from yklz import RNNDecoder, RNNCell, LSTMPeephole
 from yklz import BidirectionalRNNEncoder
 
 from seq2vec.transformer import WordEmbeddingTransformer
-from seq2vec.model import Seq2VecBase
-from seq2vec.model import TrainableInterfaceMixin
+from seq2vec.model import TrainableSeq2VecBase
 
-def _create_single_layer_seq2seq_model(
-        max_length,
-        word_embedding_size,
-        latent_size,
-        encoding_size,
-        learning_rate,
-        rho=0.9,
-        decay=0.0,
-    ):
-    inputs = Input(shape=(max_length, word_embedding_size))
-    masked_inputs = Masking(mask_value=0.0)(inputs)
-    encoded_seq = BidirectionalRNNEncoder(
-        RNNCell(
-            LSTMPeephole(
-                units=latent_size,
-                use_bias=True,
-                kernel_regularizer=l2(0.0),
-                recurrent_regularizer=l2(0.0),
-                bias_regularizer=l2(0.0),
-                implementation=2,
-                dropout=0.1,
-                recurrent_dropout=0.1,
-            ),
-            Dense(
-                units=(encoding_size // 2),
-                activation='tanh'
-            ),
-            dense_dropout=0.1
-        )
-    )(masked_inputs)
-    decoded_seq = RNNDecoder(
-        RNNCell(
-            LSTMPeephole(
-                units=latent_size,
-                use_bias=True,
-                kernel_regularizer=l2(0.0),
-                recurrent_regularizer=l2(0.0),
-                bias_regularizer=l2(0.0),
-                implementation=2,
-                dropout=0.1,
-                recurrent_dropout=0.1,
-            ),
-            Dense(
-                units=encoding_size,
-                activation='tanh'
-            ),
-            dense_dropout=0.1
-        )
-    )(encoded_seq)
-    outputs = TimeDistributed(
-        Dense(
-            units=word_embedding_size,
-            activation='tanh'
-        )
-    )(decoded_seq)
 
-    model = Model(inputs, outputs)
-    encoder = Model(inputs, encoded_seq)
-
-    optimizer = RMSprop(
-        lr=learning_rate,
-        rho=rho,
-        decay=decay,
-    )
-    model.compile(loss='cosine_proximity', optimizer=optimizer)
-    return model, encoder
-
-class Seq2SeqWord2Vec(TrainableInterfaceMixin, Seq2VecBase):
+class Seq2VecR2RWord(TrainableSeq2VecBase):
     """seq2seq auto-encoder using pretrained word vectors as input.
 
     Attributes
@@ -111,54 +36,94 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, Seq2VecBase):
             encoding_size=100,
             learning_rate=0.0001,
         ):
-        super(Seq2SeqWord2Vec, self).__init__()
-
         self.word2vec_model = word2vec_model
         self.input_transformer = WordEmbeddingTransformer(
-            word2vec_model, max_length
+            word2vec_model,
+            max_length
         )
         self.output_transformer = WordEmbeddingTransformer(
-            word2vec_model, max_length
+            word2vec_model,
+            max_length
         )
         self.word_embedding_size = word2vec_model.get_size()
-        self.max_length = max_length
-        self.learning_rate = learning_rate
-        self.latent_size = latent_size
         self.encoding_size = encoding_size
 
-        model, encoder = _create_single_layer_seq2seq_model(
-            max_length=self.max_length,
-            word_embedding_size=self.word_embedding_size,
-            latent_size=self.latent_size,
-            encoding_size=self.encoding_size,
-            learning_rate=self.learning_rate,
+        super(Seq2VecR2RWord, self).__init__(
+            max_length=max_length,
+            latent_size=latent_size,
+            learning_rate=learning_rate
         )
-        self.model = model
-        self.encoder = encoder
 
-        self.best_model_name = 'seq2vec_word2vec_best'
-        self.reduce_lr = ReduceLROnPlateau(
-            monitor='val_loss',
-            verbose=1,
-            factor=0.3,
-            patience=5,
-            cooldown=3,
-            min_lr=1e-6
+    def create_model(
+            self,
+            rho=0.9,
+            decay=0.0,
+        ):
+        inputs = Input(
+            shape=(
+                self.max_length,
+                self.word_embedding_size
+            )
         )
-        self.early_stopping = EarlyStopping(
-            monitor='val_loss',
-            patience=10,
-            verbose=1,
+        masked_inputs = Masking(mask_value=0.0)(inputs)
+        encoded_seq = BidirectionalRNNEncoder(
+            RNNCell(
+                LSTMPeephole(
+                    units=self.latent_size,
+                    use_bias=True,
+                    kernel_regularizer=l2(0.0),
+                    recurrent_regularizer=l2(0.0),
+                    bias_regularizer=l2(0.0),
+                    implementation=2,
+                    dropout=0.1,
+                    recurrent_dropout=0.1,
+                ),
+                Dense(
+                    units=(self.encoding_size // 2),
+                    activation='tanh'
+                ),
+                dense_dropout=0.1
+            )
+        )(masked_inputs)
+        decoded_seq = RNNDecoder(
+            RNNCell(
+                LSTMPeephole(
+                    units=self.latent_size,
+                    use_bias=True,
+                    kernel_regularizer=l2(0.0),
+                    recurrent_regularizer=l2(0.0),
+                    bias_regularizer=l2(0.0),
+                    implementation=2,
+                    dropout=0.1,
+                    recurrent_dropout=0.1,
+                ),
+                Dense(
+                    units=self.encoding_size,
+                    activation='tanh'
+                ),
+                dense_dropout=0.1
+            )
+        )(encoded_seq)
+        outputs = TimeDistributed(
+            Dense(
+                units=self.word_embedding_size,
+                activation='tanh'
+            )
+        )(decoded_seq)
+
+        model = Model(inputs, outputs)
+        encoder = Model(inputs, encoded_seq)
+
+        optimizer = RMSprop(
+            lr=self.learning_rate,
+            rho=rho,
+            decay=decay,
         )
-        self.model_cp = ModelCheckpoint(
-            self.best_model_name,
-            monitor='val_loss',
-            verbose=1,
-            save_best_only=True,
-        )
+        model.compile(loss='cosine_proximity', optimizer=optimizer)
+        return model, encoder
 
     def transform(self, seqs):
-        transformation = super(Seq2SeqWord2Vec, self).transform(seqs)
+        transformation = super(Seq2VecR2RWord, self).transform(seqs)
         return transformation[:, 0, :]
 
     def load_customed_model(self, file_path):
@@ -174,7 +139,8 @@ class Seq2SeqWord2Vec(TrainableInterfaceMixin, Seq2VecBase):
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)
         self.encoder = Model(
-            self.model.input, self.model.get_layer(index=2).output
+            self.model.input,
+            self.model.get_layer(index=2).output
         )
         self.word_embedding_size = self.model.input_shape[2]
         self.max_length = self.model.input_shape[1]
