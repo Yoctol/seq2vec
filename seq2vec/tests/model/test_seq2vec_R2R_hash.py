@@ -3,17 +3,17 @@ from unittest import TestCase
 import os
 
 import numpy as np
-from seq2vec.model import Seq2VecR2RChar
+from seq2vec.model import Seq2VecR2RHash
 from .test_seq2vec_base import TestSeq2VecBaseClass
 
-class TestSeq2VecR2RCharClass(TestSeq2VecBaseClass, TestCase):
+class TestSeq2VecR2RHashClass(TestSeq2VecBaseClass, TestCase):
 
     def setUp(self):
         self.max_index = 10
-        super(TestSeq2VecR2RCharClass, self).setUp()
+        super(TestSeq2VecR2RHashClass, self).setUp()
 
     def create_model(self):
-        return Seq2VecR2RChar(
+        return Seq2VecR2RHash(
             max_index=self.max_index,
             max_length=self.max_length,
             latent_size=self.latent_size,
@@ -24,7 +24,7 @@ class TestSeq2VecR2RCharClass(TestSeq2VecBaseClass, TestCase):
         answer = self.model(self.test_seq)
 
         self.model.save_model(self.model_path)
-        new_model = Seq2VecR2RChar(
+        new_model = Seq2VecR2RHash(
             max_index=1,
             max_length=1
         )

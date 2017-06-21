@@ -15,7 +15,7 @@ from seq2vec.transformer import OneHotEncodedTransformer
 from seq2vec.model import TrainableSeq2VecBase
 
 
-class Seq2VecR2RChar(TrainableSeq2VecBase):
+class Seq2VecR2RHash(TrainableSeq2VecBase):
     """Hash words and feed to seq2seq auto-encoder.
 
     Attributes
@@ -51,7 +51,7 @@ class Seq2VecR2RChar(TrainableSeq2VecBase):
             max_index, max_length
         )
 
-        super(Seq2VecR2RChar, self).__init__(
+        super(Seq2VecR2RHash, self).__init__(
             max_length,
             latent_size,
             learning_rate
@@ -122,7 +122,7 @@ class Seq2VecR2RChar(TrainableSeq2VecBase):
         return model, encoder
 
     def transform(self, seqs):
-        transformation = super(Seq2VecR2RChar, self).transform(seqs)
+        transformation = super(Seq2VecR2RHash, self).transform(seqs)
         return transformation[:, 0, :]
 
     def load_customed_model(self, file_path):
