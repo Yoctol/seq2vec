@@ -18,9 +18,9 @@ python setup.py install
 
 Simple hash:
 ```python
-from seq2vec import HashSeq2Vec
+from seq2vec import Seq2VecHash
 
-transformer = HashSeq2Vec(vector_length=100)
+transformer = Seq2VecHash(vector_length=100)
 seqs = [
     ['我', '有', '一個', '蘋果'],
     ['我', '有', 'pineapple'],
@@ -49,19 +49,20 @@ array([[ 0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,  0.,
 
 Sequence-to-sequence auto-encoder:
 
-* LSTM to LSTM auto-encoder (word embedding)
+* LSTM to LSTM auto-encoder with word embedding (RNN to RNN architecture)
 
   ```python
-  from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
-  from seq2vec.seq2seq_word2vec import Seq2SeqWord2Vec
+  from seq2vec.word2vec import GensimWord2vec
+  from seq2vec import Seq2VecR2RWord
   
   # load Gensim word2vec from word2vec_model_path
   word2vec = GensimWord2vec(word2vec_model_path)
   
-  transformer = Seq2SeqWord2Vec(
+  transformer = Seq2VecR2RWord(
         word2vec_model=word2vec,
         max_length=20,
         latent_size=300,
+        encoding_size=300,
         learning_rate=0.05
   )
   
@@ -77,22 +78,22 @@ Sequence-to-sequence auto-encoder:
   result = transformer.transform(test_seq)
   ```
   
-* CNN to LSTM auto-encoder (word embedding)
+* CNN to LSTM auto-encoder with word embedding (CNN to RNN architecture)
 
   ```python
-  from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
-  from seq2vec.seq2seq_cnn3D import Seq2SeqCNN
+  from seq2vec.word2vec import GensimWord2vec
+  from seq2vec import Seq2VecC2RWord
   
   # load Gensim word2vec from word2vec_model_path
   word2vec = GensimWord2vec(word2vec_model_path)
   
-  transformer = Seq2SeqCNN(
+  transformer = Seq2VecC2RWord(
         word2vec_model=word2vec,
         max_length=20,
+        latent_size=300,
         conv_size=5,
         channel_size=10,
         learning_rate=0.05,
-        latent_size=300,
   )
   
   train_seq = [
@@ -107,20 +108,21 @@ Sequence-to-sequence auto-encoder:
   result = transformer.transform(test_seq)
   ```
 
-* CNN to LSTM auto-encoder (char embedding)
+* CNN to LSTM auto-encoder with char embedding (CNN to RNN architecture)
 
   ```python
-  from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
-  from seq2vec.seq2seq_char2vec import Seq2SeqChar2vec
+  from seq2vec.word2vec import GensimWord2vec
+  from seq2vec import Seq2VecC2RChar
   
   # load Gensim word2vec from word2vec_model_path
   word2vec = GensimWord2vec(word2vec_model_path)
   
-  transformer = Seq2SeqChar2vec(
+  transformer = Seq2VecC2RChar(
         word2vec_model=word2vec,
-        max_length=20
-        embedding_size=100,
-        latent_size=300,
+        max_index=1000,
+        max_length=20,
+        embedding_size=200,
+        latent_size=200,
         learning_rate=0.05,
         channel_size=10,
         conv_size=5
@@ -138,15 +140,18 @@ Sequence-to-sequence auto-encoder:
   result = transformer.transform(test_seq)
   ```
   
-* LSTM to LSTM auto-encoder (char embedding)
+* LSTM to LSTM auto-encoder with hash word embedding (RNN to RNN architecture)
 
  ```python
- from seq2vec import Seq2SeqAutoEncoderUseWordHash
+ from seq2vec import Seq2VecR2RHash
 
- transformer = Seq2SeqAutoEncoderUseWordHash(
+ transformer = Seq2VecR2RHash(
      max_index=1000,
      max_length=10,
      latent_size=20,
+     embedding_size=200,
+     encoding_size=300,
+     learning_rate=0.05
  )
 
  train_seq = [
@@ -161,7 +166,7 @@ Sequence-to-sequence auto-encoder:
  result = transformer.transform(test_seq)
  ```
 
-### Training with file
+### Training with generator on file
 
 We provide an example with LSTM to LSTM auto-encoder (word embedding).
 
@@ -171,27 +176,27 @@ The file should be a tokenized txt file splitted by whitespace with a sequence
 per line.
 
 ```python
-from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
+from seq2vec.word2vec import GensimWord2vec
 
-from seq2vec.seq2seq_word2vec import Seq2SeqWord2Vec
-from seq2vec.seq2seq_word2vec import Seq2vecWord2vecSeqTransformer
-from seq2vec.data_generator import DataGenterator
+from seq2vec.model import Seq2VecR2RWord
+from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.util import DataGenterator
 
 word2vec = GensimWord2vec(word2vec_model_path)
 max_length = 20
-latent_size = 300
 
-transformer = Seq2SeqWord2Vec(
+transformer = Seq2VecR2RWord(
     word2vec_model=word2vec,
     max_length=max_length,
-    latent_size=latent_size,
+    latent_size=200,
+    encoding_size=300,
     learning_rate=0.05
 )
 
-input_transformer = Seq2vecWord2vecSeqTransformer(
+input_transformer = WordEmbeddingTransformer(
     word2vec, max_length
 )
-output_transformer = Seq2vecWord2vecSeqTransformer(
+output_transformer = WordEmbeddingTransformer(
     word2vec, max_length
 )
 
@@ -227,6 +232,64 @@ transformer.fit_generator(
 )
 ```
 
+### Customized your seq2vec model with our auto-encoder framework
+
+You can customize your seq2vec model easily with our framework.
+
+```python
+import keras
+from seq2vec.model import TrainableSeq2VecBase
+
+class YourSeq2Vec(TrainableSeq2VecBase):
+
+   def __init__(self
+      max_length,
+      latent_size,
+      learning_rate
+   ):
+      # initialize your setting and set input_transformer
+      # and output_transformer
+      # Input and output transformers transform data from 
+      # raw sequence into Keras Layer input format
+      # See seq2vec.transformer for more detail
+
+      self.input_transformer = YourInputTransformer()
+      self.output_transformer = YourOutputTransformer()
+
+      super(YourSeq2Vec, self).__init__(
+         max_length,
+         latent_size,
+         learning_rate
+      )
+
+   def create_model(self):
+      # create and compile your model in this function
+      # You should return your model and encoder here
+      # encoder is the one encoded input sequences
+
+      model.compile(loss)
+      return model, encoder
+
+   def transform(self, seqs):
+      # define how your encoder transform input sequences
+      # into fixed length vectors
+      return fixed_length_vectors
+
+   def load_customed_model(self, file_path):
+      # if you use customized layer in yklz or with your 
+      # own layers, you have to sepcify them here.
+      return keras.models.load_model(
+         file_path, 
+         custom_objects={
+            'CustomizedLayer':CustomizedLayer
+         }
+      )
+
+   def load_model(self, file_path):
+      # load your seq2vec model here and set its attribute values
+      self.model = self.load_customed_model(file_path)
+```
+
 ## Lint
 ```
 pylint --rcfile=./yoctol-pylintrc/.pylintrc seq2vec
@@ -235,6 +298,6 @@ pylint --rcfile=./yoctol-pylintrc/.pylintrc seq2vec
 
 ## Test
 ```
-python setup.py test
+python -m unittest
 ```
 
