@@ -39,6 +39,7 @@ class Seq2VecC2RWord(TrainableSeq2VecBase):
             learning_rate=0.0001,
             conv_size=5,
             channel_size=10,
+            **kwargs
         ):
         self.word2vec_model = word2vec_model
         self.input_transformer = WordEmbeddingConv3DTransformer(

@@ -24,10 +24,7 @@ class TestSeq2VecR2RHashClass(TestSeq2VecBaseClass, TestCase):
         answer = self.model(self.test_seq)
 
         self.model.save_model(self.model_path)
-        new_model = Seq2VecR2RHash(
-            max_index=1,
-            max_length=1
-        )
+        new_model = Seq2VecR2RHash()
         new_model.load_model(self.model_path)
         self.assertEqual(self.max_index, new_model.max_index)
         self.assertEqual(self.max_length, new_model.max_length)

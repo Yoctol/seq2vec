@@ -35,6 +35,7 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
             latent_size=20,
             encoding_size=100,
             learning_rate=0.0001,
+            **kwargs
         ):
         self.word2vec_model = word2vec_model
         self.input_transformer = WordEmbeddingTransformer(

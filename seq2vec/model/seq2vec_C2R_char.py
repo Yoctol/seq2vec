@@ -45,6 +45,7 @@ class Seq2VecC2RChar(TrainableSeq2VecBase):
             conv_size=5,
             channel_size=10,
             latent_size=20,
+            **kwargs
         ):
         self.word2vec = word2vec_model
         self.word_embedding_size = word2vec_model.get_size()

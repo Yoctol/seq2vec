@@ -33,12 +33,13 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
 
     def __init__(
             self,
-            max_index,
-            max_length,
+            max_index=300,
+            max_length=10,
             encoding_size=100,
             learning_rate=0.0001,
             embedding_size=64,
             latent_size=20,
+            **kwargs
         ):
         self.max_index = max_index
         self.embedding_size = embedding_size
