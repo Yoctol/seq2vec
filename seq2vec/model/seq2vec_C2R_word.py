@@ -1,107 +1,22 @@
 """Sequence-to-Sequence word2vec."""
-import numpy as np
-
-import keras.backend as K
 import keras.models
 from keras.optimizers import RMSprop
 from keras.layers import Input, Conv3D
-from keras.layers import LSTM, RepeatVector, Input, Reshape
-from keras.layers.core import Masking, Dense, Flatten, Dropout
+from keras.layers.core import Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.pooling import MaxPooling3D
-from keras.layers import merge
 from keras.models import Model
 from keras import regularizers
-from sklearn.preprocessing import normalize
 
 from yklz import MaskConv, MaskConvNet, MaskPooling, ConvEncoder
 from yklz import MaskToSeq, RNNDecoder, RNNCell, LSTMPeephole
 from seq2vec.transformer import WordEmbeddingConv3DTransformer
 from seq2vec.transformer import WordEmbeddingTransformer
-from seq2vec.model import Seq2VecBase
-from seq2vec.model import TrainableInterfaceMixin
+from seq2vec.model import TrainableSeq2VecBase
 
-def _create_cnn3D_auto_encoder_model(
-        max_length,
-        embedding_size,
-        conv_size,
-        latent_size,
-        learning_rate,
-        channel_size,
-        rho=0.9,
-        decay=0.0,
-    ):
-
-    inputs = Input(shape=(max_length, max_length, embedding_size, 1))
-
-    final_window_size = max_length - 1
-    final_feature_size = embedding_size // conv_size * channel_size
-    final_feature_window_size = 1
-
-    masked_inputs = MaskConv(0.0)(inputs)
-    masked_seqs = MaskToSeq(
-        MaskConv(0.0),
-        1
-    )(inputs)
-
-    conv = MaskConvNet(
-        Conv3D(
-            channel_size, (2, 2, conv_size), strides=(1, 1, conv_size),
-            activation='tanh', padding='valid', use_bias=False,
-            kernel_regularizer=regularizers.l2(0.001)
-        )
-    )(masked_inputs)
-
-    pooling = MaskPooling(
-        MaxPooling3D(
-            (final_window_size, final_window_size, final_feature_window_size),
-            padding='valid'
-        ),
-        pool_mode='max'
-    )(conv)
-
-    encoded = ConvEncoder()(
-        [pooling, masked_seqs]
-    )
-
-    decoded = RNNDecoder(
-        RNNCell(
-            LSTMPeephole(
-                latent_size, return_sequences=True, implementation=2,
-                unroll=False, dropout=0.1, recurrent_dropout=0.1,
-                kernel_regularizer=regularizers.l2(0.001),
-                recurrent_regularizer=regularizers.l2(0.001)
-            ),
-            Dense(
-                units=final_feature_size,
-                activation='tanh'
-            ),
-            dense_dropout=0.1
-        )
-    )(encoded)
-
-    outputs = TimeDistributed(
-        Dense(
-            embedding_size,
-            kernel_regularizer=regularizers.l2(0.001),
-            activation='tanh'
-        )
-    )(decoded)
-
-    model = Model(inputs, outputs)
-    encoder = Model(inputs, encoded)
-
-    optimizer = RMSprop(
-        lr=learning_rate,
-        rho=rho,
-        decay=decay,
-    )
-    model.compile(loss='cosine_proximity', optimizer=optimizer)
-    return model, encoder
-
-
-class Seq2SeqCNN(TrainableInterfaceMixin, Seq2VecBase):
-    """seq2seq auto-encoder using pretrained word vectors as input.
+class Seq2VecC2RWord(TrainableSeq2VecBase):
+    """seq2seq auto-encoder using pretrained word vectors as input
+       with ConvNet to RNN architecture.
 
     Attributes
     ----------
@@ -135,25 +50,109 @@ class Seq2SeqCNN(TrainableInterfaceMixin, Seq2VecBase):
             max_length
         )
         self.embedding_size = word2vec_model.get_size()
-        self.max_length = max_length
-        self.learning_rate = learning_rate
         self.conv_size = conv_size
-        self.latent_size = latent_size
         self.channel_size = channel_size
         self.encoding_size = (
             self.embedding_size // self.conv_size * self.channel_size
         )
 
-        model, encoder = _create_cnn3D_auto_encoder_model(
-            max_length=self.max_length,
-            embedding_size=self.embedding_size,
-            conv_size=self.conv_size,
-            channel_size=channel_size,
-            learning_rate=self.learning_rate,
-            latent_size=self.latent_size,
+        super(Seq2VecC2RWord, self).__init__(
+            max_length,
+            latent_size,
+            learning_rate
         )
-        self.model = model
-        self.encoder = encoder
+
+    def create_model(
+            self,
+            rho=0.9,
+            decay=0.0,
+        ):
+
+        inputs = Input(
+            shape=(
+                self.max_length,
+                self.max_length,
+                self.embedding_size,
+                1
+            )
+        )
+
+        final_window_size = self.max_length - 1
+        final_feature_size = self.embedding_size // self.conv_size * self.channel_size
+        final_feature_window_size = 1
+
+        masked_inputs = MaskConv(0.0)(inputs)
+        masked_seqs = MaskToSeq(
+            MaskConv(0.0),
+            1
+        )(inputs)
+
+        conv = MaskConvNet(
+            Conv3D(
+                self.channel_size,
+                (2, 2, self.conv_size),
+                strides=(1, 1, self.conv_size),
+                activation='tanh',
+                padding='valid',
+                use_bias=False,
+                kernel_regularizer=regularizers.l2(0.001)
+            )
+        )(masked_inputs)
+
+        pooling = MaskPooling(
+            MaxPooling3D(
+                (
+                    final_window_size,
+                    final_window_size,
+                    final_feature_window_size
+                ),
+                padding='valid'
+            ),
+            pool_mode='max'
+        )(conv)
+
+        encoded = ConvEncoder()(
+            [pooling, masked_seqs]
+        )
+
+        decoded = RNNDecoder(
+            RNNCell(
+                LSTMPeephole(
+                    self.latent_size,
+                    return_sequences=True,
+                    implementation=2,
+                    unroll=False,
+                    dropout=0.1,
+                    recurrent_dropout=0.1,
+                    kernel_regularizer=regularizers.l2(0.001),
+                    recurrent_regularizer=regularizers.l2(0.001)
+                ),
+                Dense(
+                    units=final_feature_size,
+                    activation='tanh'
+                ),
+                dense_dropout=0.1
+            )
+        )(encoded)
+
+        outputs = TimeDistributed(
+            Dense(
+                self.embedding_size,
+                kernel_regularizer=regularizers.l2(0.001),
+                activation='tanh'
+            )
+        )(decoded)
+
+        model = Model(inputs, outputs)
+        encoder = Model(inputs, encoded)
+
+        optimizer = RMSprop(
+            lr=self.learning_rate,
+            rho=rho,
+            decay=decay,
+        )
+        model.compile(loss='cosine_proximity', optimizer=optimizer)
+        return model, encoder
 
     def transform(self, seqs):
         test_x = self.input_transformer(seqs)
