@@ -1,41 +1,27 @@
 '''Test Sequence to vector using word2vec model'''
 from unittest import TestCase
-from unittest.mock import patch
-from os.path import abspath, dirname, join
 import os
 
 import numpy as np
-from seq2vec.word2vec.gensim_word2vec import GensimWord2vec
 
-from seq2vec.model import Seq2SeqChar2vec
-from seq2vec.transformer import CharEmbeddingOneHotTransformer
-from seq2vec.transformer import WordEmbeddingTransformer
+from seq2vec.model import Seq2VecC2RChar
+from .test_seq2vec_base import TestSeq2VecBaseClass
 
-from .test_seq2vec_base import TestSeq2vecBaseClass
-
-class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
+class TestSeq2VecC2RCharClass(TestSeq2VecBaseClass, TestCase):
 
     def setUp(self):
-        dir_path = dirname(abspath(__file__))
-        word2vec_path = join(dir_path, '../word2vec.model.bin')
-        self.word2vec = GensimWord2vec(word2vec_path)
-
         self.embedding_size = 300
         self.max_index = 1000
         self.conv_size = 5
         self.channel_size = 10
-        self.latent_size = 100
+        super(TestSeq2VecC2RCharClass, self).setUp()
+
         self.encoding_size = (
             self.channel_size * self.embedding_size // self.conv_size
         )
 
-        super(TestSeq2vecChar2vecClass, self).setUp(
-            self.latent_size,
-            self.encoding_size,
-        )
-
-    def initialize_model(self):
-        return Seq2SeqChar2vec(
+    def create_model(self):
+        return Seq2VecC2RChar(
             self.word2vec,
             max_index=self.max_index,
             max_length=self.max_length,
@@ -44,25 +30,11 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
             channel_size=self.channel_size,
         )
 
-    def initialize_input_transformer(self):
-        return CharEmbeddingOneHotTransformer(
-            max_index=self.max_index,
-            max_length=self.max_length,
-        )
-
-    def initialize_output_transformer(self):
-        return WordEmbeddingTransformer(
-            self.word2vec,
-            max_length=self.max_length,
-        )
-
-    @patch('keras.models.Model.fit')
-    def test_load_save_model(self, _):
-        self.model.fit(self.train_seq)
+    def test_load_save_model(self):
         answer = self.model.transform(self.test_seq)
 
         self.model.save_model(self.model_path)
-        new_model = Seq2SeqChar2vec(
+        new_model = Seq2VecC2RChar(
             self.word2vec
         )
         new_model.load_model(self.model_path)
@@ -76,17 +48,3 @@ class TestSeq2vecChar2vecClass(TestSeq2vecBaseClass, TestCase):
         self.assertEqual(self.encoding_size, new_model.encoding_size)
         self.assertEqual(self.max_index, new_model.max_index)
         os.remove(self.model_path)
-
-    def test_input_transformer(self):
-        transformed_input = self.input_transformer(self.train_seq)
-        self.assertEqual(
-            transformed_input.shape,
-            (len(self.train_seq), self.max_length, self.max_index)
-        )
-
-    def test_output_transformer(self):
-        transformed_output = self.output_transformer(self.train_seq)
-        self.assertEqual(
-            transformed_output.shape,
-            (len(self.train_seq), self.max_length, self.word2vec.get_size())
-        )
