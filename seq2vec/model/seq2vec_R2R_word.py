@@ -6,7 +6,7 @@ from keras.layers.wrappers import TimeDistributed
 from keras.models import Model, Input
 from keras.regularizers import l2
 from yklz import RNNDecoder, RNNCell, LSTMPeephole
-from yklz import BidirectionalRNNEncoder
+from yklz import BidirectionalRNNEncoder, Pick
 
 from seq2vec.transformer import WordEmbeddingTransformer
 from seq2vec.model import TrainableSeq2VecBase
@@ -113,7 +113,8 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
         )(decoded_seq)
 
         model = Model(inputs, outputs)
-        encoder = Model(inputs, encoded_seq)
+        picked = Pick()(encoded_seq)
+        encoder = Model(inputs, picked)
 
         optimizer = RMSprop(
             lr=self.learning_rate,
@@ -123,25 +124,23 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
         model.compile(loss='cosine_proximity', optimizer=optimizer)
         return model, encoder
 
-    def transform(self, seqs):
-        transformation = super(Seq2VecR2RWord, self).transform(seqs)
-        return transformation[:, 0, :]
-
     def load_customed_model(self, file_path):
         return keras.models.load_model(
             file_path, custom_objects={
                 'BidirectionalRNNEncoder':BidirectionalRNNEncoder,
                 'LSTMPeephole':LSTMPeephole,
                 'RNNDecoder':RNNDecoder,
-                'RNNCell':RNNCell
+                'RNNCell':RNNCell,
+                'Pick':Pick
             }
         )
 
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)
+        picked = Pick()(self.model.get_layer(index=2).output)
         self.encoder = Model(
             self.model.input,
-            self.model.get_layer(index=2).output
+            picked
         )
         self.word_embedding_size = self.model.input_shape[2]
         self.max_length = self.model.input_shape[1]

@@ -8,7 +8,7 @@ from keras.layers import Dense
 from keras.models import Model
 
 from yklz import BidirectionalRNNEncoder, RNNDecoder
-from yklz import LSTMPeephole, RNNCell
+from yklz import LSTMPeephole, RNNCell, Pick
 
 from seq2vec.transformer import HashIndexTransformer
 from seq2vec.transformer import OneHotEncodedTransformer
@@ -112,7 +112,9 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
         )(decoded)
 
         model = Model(inputs, outputs)
-        encoder = Model(inputs, encoded)
+
+        picked =  Pick()(encoded)
+        encoder = Model(inputs, picked)
 
         optimizer = RMSprop(
             lr=self.learning_rate,
@@ -122,25 +124,23 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
         model.compile(loss='categorical_crossentropy', optimizer=optimizer)
         return model, encoder
 
-    def transform(self, seqs):
-        transformation = super(Seq2VecR2RHash, self).transform(seqs)
-        return transformation[:, 0, :]
-
     def load_customed_model(self, file_path):
         return keras.models.load_model(
             file_path, custom_objects={
                 'BidirectionalRNNEncoder':BidirectionalRNNEncoder,
                 'LSTMPeephole':LSTMPeephole,
                 'RNNDecoder':RNNDecoder,
-                'RNNCell':RNNCell
+                'RNNCell':RNNCell,
+                'Pick':Pick,
             }
         )
 
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)
+        picked = Pick()(self.model.get_layer(index=2).output)
         self.encoder = Model(
             self.model.input,
-            self.model.get_layer(index=2).output
+            picked
         )
         self.max_index = self.model.get_layer(index=1).input_dim
         self.max_length = self.model.input_shape[1]

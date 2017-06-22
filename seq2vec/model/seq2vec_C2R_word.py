@@ -9,7 +9,7 @@ from keras.models import Model
 from keras import regularizers
 
 from yklz import MaskConv, MaskConvNet, MaskPooling, ConvEncoder
-from yklz import MaskToSeq, RNNDecoder, RNNCell, LSTMPeephole
+from yklz import MaskToSeq, RNNDecoder, RNNCell, LSTMPeephole, Pick
 from seq2vec.transformer import WordEmbeddingConv3DTransformer
 from seq2vec.transformer import WordEmbeddingTransformer
 from seq2vec.model import TrainableSeq2VecBase
@@ -145,7 +145,8 @@ class Seq2VecC2RWord(TrainableSeq2VecBase):
         )(decoded)
 
         model = Model(inputs, outputs)
-        encoder = Model(inputs, encoded)
+        picked = Pick()(encoded)
+        encoder = Model(inputs, picked)
 
         optimizer = RMSprop(
             lr=self.learning_rate,
@@ -154,10 +155,6 @@ class Seq2VecC2RWord(TrainableSeq2VecBase):
         )
         model.compile(loss='cosine_proximity', optimizer=optimizer)
         return model, encoder
-
-    def transform(self, seqs):
-        test_x = self.input_transformer(seqs)
-        return self.encoder.predict(test_x)[:, 0, :]
 
     def load_customed_model(self, file_path):
         return keras.models.load_model(
@@ -170,21 +167,23 @@ class Seq2VecC2RWord(TrainableSeq2VecBase):
                 'ConvEncoder': ConvEncoder,
                 'LSTMPeephole':LSTMPeephole,
                 'RNNCell':RNNCell,
+                'Pick':Pick
             }
         )
 
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)
-        encoded_output = self.model.get_layer(index=5).output
+        picked = Pick()(self.model.get_layer(index=5).output)
         self.encoder = Model(
-            self.model.input, encoded_output
+            self.model.input,
+            picked
         )
         self.embedding_size = self.model.input_shape[3]
         self.max_length = self.model.input_shape[1]
         self.conv_size = self.model.get_layer(index=2).layer.kernel_size[2]
         self.latent_size = self.model.get_layer(index=6).layer.recurrent_layer.units
         self.channel_size = self.model.get_layer(index=2).layer.filters
-        self.encoding_size = self.encoder.output_shape[2]
+        self.encoding_size = self.encoder.output_shape[1]
 
         self.input_transformer = WordEmbeddingConv3DTransformer(
             self.word2vec_model,
