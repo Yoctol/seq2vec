@@ -193,23 +193,16 @@ transformer = Seq2VecR2RWord(
     learning_rate=0.05
 )
 
-input_transformer = WordEmbeddingTransformer(
-    word2vec, max_length
-)
-output_transformer = WordEmbeddingTransformer(
-    word2vec, max_length
-)
-
 train_data = DataGenterator(
     corpus_for_training_path, 
-    input_transformer,
-    output_transformer, 
+    transformer.input_transformer,
+    transformer.output_transformer, 
     batch_size=128
 )
 test_data = DataGenterator(
     corpus_for_validation_path, 
-    input_transformer,
-    output_transformer, 
+    transformer.input_transformer,
+    transformer.output_transformer, 
     batch_size=128
 )
 
@@ -256,6 +249,10 @@ class YourSeq2Vec(TrainableSeq2VecBase):
       self.input_transformer = YourInputTransformer()
       self.output_transformer = YourOutputTransformer()
 
+      # add your customized layer
+      self.custom_objects = {}
+      self.custom_objects[customized_class_name] = customized_class
+
       super(YourSeq2Vec, self).__init__(
          max_length,
          latent_size,
@@ -269,21 +266,6 @@ class YourSeq2Vec(TrainableSeq2VecBase):
 
       model.compile(loss)
       return model, encoder
-
-   def transform(self, seqs):
-      # define how your encoder transform input sequences
-      # into fixed length vectors
-      return fixed_length_vectors
-
-   def load_customed_model(self, file_path):
-      # if you use customized layer in yklz or with your 
-      # own layers, you have to sepcify them here.
-      return keras.models.load_model(
-         file_path, 
-         custom_objects={
-            'CustomizedLayer':CustomizedLayer
-         }
-      )
 
    def load_model(self, file_path):
       # load your seq2vec model here and set its attribute values
