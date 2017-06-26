@@ -5,4 +5,4 @@ keras
 yoctol_utils
 gensim
 h5py
-yoctol_keras_layer_zoo
+yoctol_keras_layer_zoo>=0.6.3
