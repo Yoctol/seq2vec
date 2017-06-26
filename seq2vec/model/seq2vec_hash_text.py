@@ -3,10 +3,10 @@ import numpy as np
 
 from yoctol_utils.hash import consistent_hash
 
-from .base import BaseSeq2Vec
+from .seq2vec_base import Seq2VecBase
 
 
-class HashSeq2Vec(BaseSeq2Vec):
+class Seq2VecHash(Seq2VecBase):
     """Hash words to index.
 
     Attributes
