@@ -2,10 +2,10 @@
 import keras.models
 from keras.optimizers import RMSprop
 from keras.layers.core import Masking, Dense
+from keras.layers import LSTM
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Model, Input
-from keras.regularizers import l2
-from yklz import RNNDecoder, RNNCell, LSTMPeephole
+from yklz import RNNDecoder, RNNCell
 from yklz import BidirectionalRNNEncoder, Pick
 
 from seq2vec.transformer import WordEmbeddingTransformer
@@ -54,6 +54,10 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
             latent_size=latent_size,
             learning_rate=learning_rate
         )
+        self.custom_objects['BidirectionalRNNEncoder'] = BidirectionalRNNEncoder
+        self.custom_objects['RNNDecoder'] = RNNDecoder
+        self.custom_objects['RNNCell'] = RNNCell
+        self.custom_objects['Pick'] = Pick
 
     def create_model(
             self,
@@ -69,40 +73,34 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
         masked_inputs = Masking(mask_value=0.0)(inputs)
         encoded_seq = BidirectionalRNNEncoder(
             RNNCell(
-                LSTMPeephole(
+                LSTM(
                     units=self.latent_size,
                     use_bias=True,
-                    kernel_regularizer=l2(0.0),
-                    recurrent_regularizer=l2(0.0),
-                    bias_regularizer=l2(0.0),
                     implementation=2,
-                    dropout=0.1,
-                    recurrent_dropout=0.1,
+                    dropout=0.,
+                    recurrent_dropout=0.,
                 ),
                 Dense(
                     units=(self.encoding_size // 2),
                     activation='tanh'
                 ),
-                dense_dropout=0.1
+                dense_dropout=0.
             )
         )(masked_inputs)
         decoded_seq = RNNDecoder(
             RNNCell(
-                LSTMPeephole(
+                LSTM(
                     units=self.latent_size,
                     use_bias=True,
-                    kernel_regularizer=l2(0.0),
-                    recurrent_regularizer=l2(0.0),
-                    bias_regularizer=l2(0.0),
                     implementation=2,
-                    dropout=0.1,
-                    recurrent_dropout=0.1,
+                    dropout=0.,
+                    recurrent_dropout=0.,
                 ),
                 Dense(
                     units=self.encoding_size,
                     activation='tanh'
                 ),
-                dense_dropout=0.1
+                dense_dropout=0.
             )
         )(encoded_seq)
         outputs = TimeDistributed(
@@ -123,17 +121,6 @@ class Seq2VecR2RWord(TrainableSeq2VecBase):
         )
         model.compile(loss='cosine_proximity', optimizer=optimizer)
         return model, encoder
-
-    def load_customed_model(self, file_path):
-        return keras.models.load_model(
-            file_path, custom_objects={
-                'BidirectionalRNNEncoder':BidirectionalRNNEncoder,
-                'LSTMPeephole':LSTMPeephole,
-                'RNNDecoder':RNNDecoder,
-                'RNNCell':RNNCell,
-                'Pick':Pick
-            }
-        )
 
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)

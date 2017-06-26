@@ -4,11 +4,11 @@ from keras.models import Input
 from keras.optimizers import RMSprop
 from keras.layers.embeddings import Embedding
 from keras.layers.wrappers import TimeDistributed
-from keras.layers import Dense
+from keras.layers import Dense, LSTM
 from keras.models import Model
 
 from yklz import BidirectionalRNNEncoder, RNNDecoder
-from yklz import LSTMPeephole, RNNCell, Pick
+from yklz import RNNCell, Pick
 
 from seq2vec.transformer import HashIndexTransformer
 from seq2vec.transformer import OneHotEncodedTransformer
@@ -37,12 +37,12 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
             max_length=10,
             encoding_size=100,
             learning_rate=0.0001,
-            embedding_size=64,
+            word_embedding_size=64,
             latent_size=20,
             **kwargs
         ):
         self.max_index = max_index
-        self.embedding_size = embedding_size
+        self.word_embedding_size = word_embedding_size
         self.encoding_size = encoding_size
 
         self.input_transformer = HashIndexTransformer(
@@ -57,11 +57,15 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
             latent_size,
             learning_rate
         )
+        self.custom_objects['BidirectionalRNNEncoder']= BidirectionalRNNEncoder
+        self.custom_objects['RNNDecoder'] = RNNDecoder
+        self.custom_objects['RNNCell'] = RNNCell
+        self.custom_objects['Pick'] = Pick
 
     def create_model(
             self,
             rho=0.9,
-            decay=0.01,
+            decay=0.0,
         ):
 
         inputs = Input(
@@ -71,37 +75,37 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
         )
         char_embedding = Embedding(
             input_dim=self.max_index,
-            output_dim=self.embedding_size,
+            output_dim=self.word_embedding_size,
             input_length=self.max_length,
             mask_zero=True,
         )(inputs)
 
         encoded = BidirectionalRNNEncoder(
             RNNCell(
-                LSTMPeephole(
+                LSTM(
                     units=self.latent_size,
-                    dropout=0.1,
-                    recurrent_dropout=0.1
+                    dropout=0.,
+                    recurrent_dropout=0.
                 ),
                 Dense(
                     units=self.encoding_size // 2,
                     activation='tanh'
                 ),
-                dense_dropout=0.1
+                dense_dropout=0.
             )
         )(char_embedding)
         decoded = RNNDecoder(
             RNNCell(
-                LSTMPeephole(
+                LSTM(
                     units=self.latent_size,
-                    dropout=0.1,
-                    recurrent_dropout=0.1
+                    dropout=0.,
+                    recurrent_dropout=0.
                 ),
                 Dense(
                     units=self.encoding_size,
                     activation='tanh'
                 ),
-                dense_dropout=0.1
+                dense_dropout=0.
             )
         )(encoded)
         outputs = TimeDistributed(
@@ -113,7 +117,7 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
 
         model = Model(inputs, outputs)
 
-        picked =  Pick()(encoded)
+        picked = Pick()(encoded)
         encoder = Model(inputs, picked)
 
         optimizer = RMSprop(
@@ -124,17 +128,6 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
         model.compile(loss='categorical_crossentropy', optimizer=optimizer)
         return model, encoder
 
-    def load_customed_model(self, file_path):
-        return keras.models.load_model(
-            file_path, custom_objects={
-                'BidirectionalRNNEncoder':BidirectionalRNNEncoder,
-                'LSTMPeephole':LSTMPeephole,
-                'RNNDecoder':RNNDecoder,
-                'RNNCell':RNNCell,
-                'Pick':Pick,
-            }
-        )
-
     def load_model(self, file_path):
         self.model = self.load_customed_model(file_path)
         picked = Pick()(self.model.get_layer(index=2).output)
@@ -144,7 +137,7 @@ class Seq2VecR2RHash(TrainableSeq2VecBase):
         )
         self.max_index = self.model.get_layer(index=1).input_dim
         self.max_length = self.model.input_shape[1]
-        self.embedding_size = self.model.get_layer(index=1).output_dim
+        self.word_embedding_size = self.model.get_layer(index=1).output_dim
         self.latent_size = self.model.get_layer(index=2).layer.recurrent_layer.units
         self.encoding_size = self.model.get_layer(index=2).layer.dense_layer.units * 2
 

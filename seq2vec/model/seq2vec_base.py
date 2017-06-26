@@ -64,6 +64,7 @@ class TrainableSeq2VecBase(Seq2VecBase):
         self.max_length = max_length
         self.learning_rate = learning_rate
         self.latent_size = latent_size
+        self.custom_objects = {}
         self.model, self.encoder = self.create_model()
 
         self.best_model_name = self.__class__.__name__ + '_best'
@@ -149,7 +150,10 @@ class TrainableSeq2VecBase(Seq2VecBase):
         self.model.save(file_path)
 
     def load_customed_model(self, file_path):
-        return load_model(file_path)
+        return load_model(
+            filepath=file_path,
+            custom_objects=self.custom_objects
+        )
 
     def fit_transform(self, seqs):
         self.fit(seqs)

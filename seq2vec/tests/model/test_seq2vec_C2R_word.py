@@ -14,9 +14,8 @@ class TestSeq2VecC2RWordClass(TestSeq2VecBaseClass, TestCase):
         self.conv_size = 5
         self.channel_size = 10
         super(TestSeq2VecC2RWordClass, self).setUp()
-        self.embedding_size = self.word2vec.get_size()
         self.encoding_size = (
-            self.embedding_size // self.conv_size * self.channel_size
+            self.word_embedding_size // self.conv_size * self.channel_size
         )
 
     def create_model(self):
@@ -41,7 +40,7 @@ class TestSeq2VecC2RWordClass(TestSeq2VecBaseClass, TestCase):
         np.testing.assert_array_almost_equal(answer, result)
         self.assertEqual(self.conv_size, new_model.conv_size)
         self.assertEqual(self.channel_size, new_model.channel_size)
-        self.assertEqual(self.embedding_size, new_model.embedding_size)
+        self.assertEqual(self.word_embedding_size, new_model.word_embedding_size)
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)

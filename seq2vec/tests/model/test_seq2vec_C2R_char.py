@@ -10,14 +10,13 @@ from .test_seq2vec_base import TestSeq2VecBaseClass
 class TestSeq2VecC2RCharClass(TestSeq2VecBaseClass, TestCase):
 
     def setUp(self):
-        self.embedding_size = 300
+        self.char_embedding_size = 300
         self.max_index = 1000
         self.conv_size = 5
         self.channel_size = 10
         super(TestSeq2VecC2RCharClass, self).setUp()
-
         self.encoding_size = (
-            self.channel_size * self.embedding_size // self.conv_size
+            self.channel_size * self.char_embedding_size // self.conv_size
         )
 
     def create_model(self):
@@ -25,7 +24,7 @@ class TestSeq2VecC2RCharClass(TestSeq2VecBaseClass, TestCase):
             self.word2vec,
             max_index=self.max_index,
             max_length=self.max_length,
-            embedding_size=self.embedding_size,
+            char_embedding_size=self.char_embedding_size,
             conv_size=self.conv_size,
             channel_size=self.channel_size,
         )
@@ -43,7 +42,7 @@ class TestSeq2VecC2RCharClass(TestSeq2VecBaseClass, TestCase):
         np.testing.assert_array_almost_equal(answer, result)
         self.assertEqual(self.conv_size, new_model.conv_size)
         self.assertEqual(self.channel_size, new_model.channel_size)
-        self.assertEqual(self.embedding_size, new_model.embedding_size)
+        self.assertEqual(self.char_embedding_size, new_model.char_embedding_size)
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
         self.assertEqual(self.max_index, new_model.max_index)

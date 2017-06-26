@@ -17,7 +17,8 @@ class TestSeq2VecR2RHashClass(TestSeq2VecBaseClass, TestCase):
             max_index=self.max_index,
             max_length=self.max_length,
             latent_size=self.latent_size,
-            encoding_size=self.encoding_size
+            encoding_size=self.encoding_size,
+            word_embedding_size=self.word_embedding_size
         )
 
     def test_load_save_model(self):
@@ -30,6 +31,10 @@ class TestSeq2VecR2RHashClass(TestSeq2VecBaseClass, TestCase):
         self.assertEqual(self.max_length, new_model.max_length)
         self.assertEqual(self.latent_size, new_model.latent_size)
         self.assertEqual(self.encoding_size, new_model.encoding_size)
+        self.assertEqual(
+            self.word_embedding_size,
+            new_model.word_embedding_size
+        )
         result = new_model(self.test_seq)
         np.testing.assert_array_almost_equal(answer, result)
         os.remove(self.model_path)

@@ -18,6 +18,7 @@ class TestSeq2VecBaseClass(object):
         self.data_path = join(self.dir_path, '../test_corpus.txt')
         word2vec_path = join(self.dir_path, '../word2vec.model.bin')
         self.word2vec = GensimWord2vec(word2vec_path)
+        self.word_embedding_size = self.word2vec.get_size()
 
         self.model = self.create_model()
         self.input_transformer = self.model.input_transformer
