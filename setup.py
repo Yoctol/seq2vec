@@ -10,7 +10,7 @@ setup(
     name='seq2vec',
     version='0.4.0',
     description='A package to turn sequence of words'
-    'into a fix-length representation vector',
+    ' into a fix-length representation vector',
     license='GNU 3.0',
     author='cph',
     packages=find_packages(),
