@@ -32,10 +32,10 @@ class BidirectionalRNNEncoder(nn.Module):
         """
         batch_size = inputs.size()[1]
         state_shape = self.n_cells, batch_size, self.hidden_size
-        h0 = Variable(inputs.data.new(*state_shape).zero_())
-        c0 = Variable(inputs.data.new(*state_shape).zero_())
 
-        _, (ht, _) = self.rnn(inputs, (h0, c0))
+        # Pytorch automatically input zero vectors as init. states 
+        # if (h0, c0) is not given
+        _, (ht, _) = self.rnn(inputs)
 
         return self.transform_state_bi(ht, batch_size)
 
