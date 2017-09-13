@@ -27,10 +27,12 @@ class Seq2VecBase(object):
         Raises
         ------
         """
-        result = []
-        for seq in seqs:
-            result.append(self.transform_single_sequence(seq))
-        return np.array(result)
+        n_seqs = len(seqs)
+        result = np.zeros((n_seqs, self.latent_size), dtype=np.float32)
+
+        for idx, seq in enumerate(seqs):
+            result[idx, :] = self.transform_single_sequence(seq)
+        return result
 
     @abstractmethod
     def transform_single_sequence(self, seq):
