@@ -23,9 +23,9 @@ def word2vec_seq(seq, word2vec):
     for word in seq:
         try:
             word_arr = word2vec[word]
-            normalize(word_arr.reshape(1, -1), copy=False)
+            new_word_arr = normalize(word_arr.reshape(1, -1), copy=True)
             transformed_seq.append(
-                word_arr.reshape(word_embedding_size)
+                new_word_arr.reshape(word_embedding_size)
             )
         except KeyError:
             pass
