@@ -8,7 +8,7 @@ except IOError:
 
 setup(
     name='seq2vec',
-    version='0.4.0',
+    version='0.6.0',
     description='A package to turn sequence of words'
     ' into a fix-length representation vector',
     license='GNU 3.0',
@@ -18,7 +18,7 @@ setup(
         'numpy',
         'keras',
         'yoctol_utils',
-        'gensim',
+        'gensim==3.1.0',
         'h5py',
         'yoctol_keras_layer_zoo',
         'tensorflow'
